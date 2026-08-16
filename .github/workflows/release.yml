@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - shell: pwsh
+        run: ./scripts/build_windows.ps1
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/sNote-*-windows-x64.zip
+          generate_release_notes: true

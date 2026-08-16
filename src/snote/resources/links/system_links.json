@@ -1,0 +1,14 @@
+[
+  {
+    "name": "PowerShell",
+    "url": "powershell.exe"
+  },
+  {
+    "name": "Calculator",
+    "url": "calc.exe"
+  },
+  {
+    "name": "Task Manager",
+    "url": "taskmgr.exe"
+  }
+]

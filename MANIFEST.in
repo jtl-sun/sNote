@@ -1,0 +1,3 @@
+include LICENSE
+include README.md
+recursive-include src/snote/resources *.ico *.png *.md *.json

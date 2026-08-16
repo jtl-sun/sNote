@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*.log
+*.spec
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+release/
+*.egg-info/
+
+# Personal sNote data must never be committed.
+links/
+!_data/
+recent_files.json
+editor_settings.json
+
+# Local editor and OS files.
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
