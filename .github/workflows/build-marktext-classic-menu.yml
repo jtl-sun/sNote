@@ -83,7 +83,9 @@ jobs:
             @{ Path = 'marktext/packages/desktop/src/main/exceptionHandler.ts'; Old = "companyName: 'marktext'"; New = "companyName: 'mEdit'" },
             @{ Path = 'marktext/packages/desktop/src/main/exceptionHandler.ts'; Old = "productName: 'marktext'"; New = "productName: 'mEdit'" },
             @{ Path = 'marktext/packages/desktop/src/main/windows/editor.ts'; Old = 'MarkText has crashed'; New = 'mEdit has crashed' },
-            @{ Path = 'marktext/packages/desktop/src/main/cli/index.ts'; Old = 'MarkText:'; New = 'mEdit:' }
+            @{ Path = 'marktext/packages/desktop/src/main/cli/index.ts'; Old = 'MarkText:'; New = 'mEdit:' },
+            @{ Path = 'marktext/packages/desktop/src/renderer/src/components/editorWithTabs/editor.vue'; Old = '  padding-bottom: 100vh;'; New = "  padding-bottom: 100vh;`n  margin-left: 0;`n  margin-right: auto;" },
+            @{ Path = 'marktext/packages/desktop/src/renderer/src/components/editorWithTabs/sourceCode.vue'; Old = '  margin: 50px auto;'; New = '  margin: 50px 0;' }
           )
           foreach ($replacement in $replacements) {
             $content = Get-Content $replacement.Path -Raw
