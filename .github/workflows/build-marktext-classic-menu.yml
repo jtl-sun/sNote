@@ -1,0 +1,95 @@
+name: Build MarkText Classic Menu for Windows
+
+on:
+  push:
+    branches:
+      - agent/build-marktext-classic-menu
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out build branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.1'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Enable pnpm
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack install --global pnpm@10.33.4
+
+      - name: Download pinned MarkText source
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/marktext/marktext.git marktext
+          Set-Location marktext
+          git fetch --depth 1 origin e52106f
+          git checkout e52106f
+
+      - name: Apply classic drop-down menu patch
+        shell: pwsh
+        run: |
+          $patchBase64 = 'ZGlmZiAtLWdpdCBhL3BhY2thZ2VzL2Rlc2t0b3Avc3JjL21haW4vcHJlZmVyZW5jZXMvaW5kZXgudHMgYi9wYWNrYWdlcy9kZXNrdG9wL3NyYy9tYWluL3ByZWZlcmVuY2VzL2luZGV4LnRzCmluZGV4IDg5MWNhYmQuLjU2NzU5ZjggMTAwNjQ0Ci0tLSBhL3BhY2thZ2VzL2Rlc2t0b3Avc3JjL21haW4vcHJlZmVyZW5jZXMvaW5kZXgudHMKKysrIGIvcGFja2FnZXMvZGVza3RvcC9zcmMvbWFpbi9wcmVmZXJlbmNlcy9pbmRleC50cwpAQCAtNTAsNiArNTAsMTUgQEAgY2xhc3MgUHJlZmVyZW5jZSBleHRlbmRzIFR5cGVkRW1pdHRlcjxQcmVmZXJlbmNlRXZlbnRzPiB7CiAgICAgICAgICAgaWYgKHN0b3JlLmdldCgnc3RhcnRVcEFjdGlvbicpID09PSAnbGFzdFN0YXRlJykgewogICAgICAgICAgICAgc3RvcmUuc2V0KCdzdGFydFVwQWN0aW9uJywgJ29wZW5MYXN0Rm9sZGVyJykKICAgICAgICAgICB9CisgICAgICAgIH0sCisgICAgICAgIC8vIFRoaXMgdmFyaWFudCByZXBsYWNlcyB0aGUgaGlkZGVuIGhhbWJ1cmdlciBtZW51IHdpdGggdGhlIGZhbWlsaWFyCisgICAgICAgIC8vIG9wZXJhdGluZy1zeXN0ZW0gbWVudSBiYXIuIEFwcGx5IHRoZSBuZXcgZGVmYXVsdCBvbmNlIGZvciBwZW9wbGUKKyAgICAgICAgLy8gdXBncmFkaW5nIGZyb20gdGhlIGxhc3Qgc3RhYmxlIE1hcmtUZXh0IHJlbGVhc2U7IHRoZXkgY2FuIHN0aWxsCisgICAgICAgIC8vIGNob29zZSB0aGUgY3VzdG9tIHRpdGxlIGJhciBhZ2FpbiBhZnRlcndhcmRzLgorICAgICAgICAnMC4xOS4wJzogKHN0b3JlKSA9PiB7CisgICAgICAgICAgaWYgKHN0b3JlLmdldCgndGl0bGVCYXJTdHlsZScpID09PSAnY3VzdG9tJykgeworICAgICAgICAgICAgc3RvcmUuc2V0KCd0aXRsZUJhclN0eWxlJywgJ25hdGl2ZScpCisgICAgICAgICAgfQogICAgICAgICB9CiAgICAgICB9LAogICAgICAgYmVmb3JlRWFjaE1pZ3JhdGlvbjogKF9zdG9yZSwgY29udGV4dCkgPT4gewpkaWZmIC0tZ2l0IGEvcGFja2FnZXMvZGVza3RvcC9zcmMvbWFpbi9wcmVmZXJlbmNlcy9zY2hlbWEuanNvbiBiL3BhY2thZ2VzL2Rlc2t0b3Avc3JjL21haW4vcHJlZmVyZW5jZXMvc2NoZW1hLmpzb24KaW5kZXggYzIwMjc4NS4uOGNiOTg5NCAxMDA2NDQKLS0tIGEvcGFja2FnZXMvZGVza3RvcC9zcmMvbWFpbi9wcmVmZXJlbmNlcy9zY2hlbWEuanNvbgorKysgYi9wYWNrYWdlcy9kZXNrdG9wL3NyYy9tYWluL3ByZWZlcmVuY2VzL3NjaGVtYS5qc29uCkBAIC0xMyw3ICsxMyw3IEBACiAgICJ0aXRsZUJhclN0eWxlIjogewogICAgICJkZXNjcmlwdGlvbiI6ICJHZW5lcmFsLS1UaGUgdGl0bGUgYmFyIHN0eWxlIChXaW5kb3dzIGFuZCBMaW51eCBzeXN0ZW0gb25seSkuIiwKICAgICAiZW51bSI6IFsiY3VzdG9tIiwgIm5hdGl2ZSJdLAotICAgICJkZWZhdWx0IjogImN1c3RvbSIKKyAgICAiZGVmYXVsdCI6ICJuYXRpdmUiCiAgIH0sCiAgICJvcGVuRmlsZXNJbk5ld1dpbmRvdyI6IHsKICAgICAiZGVzY3JpcHRpb24iOiAiR2VuZXJhbC0tT3BlbiBmaWxlcyBpbiBhIG5ldyB3aW5kb3cuIiwKZGlmZiAtLWdpdCBhL3BhY2thZ2VzL2Rlc2t0b3Avc3JjL3JlbmRlcmVyL3NyYy9zdG9yZS9wcmVmZXJlbmNlcy50cyBiL3BhY2thZ2VzL2Rlc2t0b3Avc3JjL3JlbmRlcmVyL3NyYy9zdG9yZS9wcmVmZXJlbmNlcy50cwppbmRleCAzMjVkZmUyLi42ZTFkYzI0IDEwMDY0NAotLS0gYS9wYWNrYWdlcy9kZXNrdG9wL3NyYy9yZW5kZXJlci9zcmMvc3RvcmUvcHJlZmVyZW5jZXMudHMKKysrIGIvcGFja2FnZXMvZGVza3RvcC9zcmMvcmVuZGVyZXIvc3JjL3N0b3JlL3ByZWZlcmVuY2VzLnRzCkBAIC0xNDEsNyArMTQxLDcgQEAgZXhwb3J0IGNvbnN0IHVzZVByZWZlcmVuY2VzU3RvcmUgPSBkZWZpbmVTdG9yZSgncHJlZmVyZW5jZXMnLCB7CiAgIHN0YXRlOiAoKTogUHJlZmVyZW5jZXNTdGF0ZSA9PiAoewogICAgIGF1dG9TYXZlOiBmYWxzZSwKICAgICBhdXRvU2F2ZURlbGF5OiA1MDAwLAotICAgIHRpdGxlQmFyU3R5bGU6ICdjdXN0b20nLAorICAgIHRpdGxlQmFyU3R5bGU6ICduYXRpdmUnLAogICAgIG9wZW5GaWxlc0luTmV3V2luZG93OiBmYWxzZSwKICAgICBvcGVuRm9sZGVySW5OZXdXaW5kb3c6IGZhbHNlLAogICAgIHpvb206IDEuMCwKZGlmZiAtLWdpdCBhL3BhY2thZ2VzL2Rlc2t0b3Avc3RhdGljL3ByZWZlcmVuY2UuanNvbiBiL3BhY2thZ2VzL2Rlc2t0b3Avc3RhdGljL3ByZWZlcmVuY2UuanNvbgppbmRleCBjM2Q3NTdlLi44MjgwYjRlIDEwMDY0NAotLS0gYS9wYWNrYWdlcy9kZXNrdG9wL3N0YXRpYy9wcmVmZXJlbmNlLmpzb24KKysrIGIvcGFja2FnZXMvZGVza3RvcC9zdGF0aWMvcHJlZmVyZW5jZS5qc29uCkBAIC0xLDcgKzEsNyBAQAogewogICAiYXV0b1NhdmUiOiBmYWxzZSwKICAgImF1dG9TYXZlRGVsYXkiOiA1MDAwLAotICAidGl0bGVCYXJTdHlsZSI6ICJjdXN0b20iLAorICAidGl0bGVCYXJTdHlsZSI6ICJuYXRpdmUiLAogICAib3BlbkZpbGVzSW5OZXdXaW5kb3ciOiBmYWxzZSwKICAgIm9wZW5Gb2xkZXJJbk5ld1dpbmRvdyI6IGZhbHNlLAogICAiem9vbSI6IDEuMCwK'
+          [IO.File]::WriteAllBytes('marktext/classic-menu.patch', [Convert]::FromBase64String($patchBase64))
+          Set-Location marktext
+          git apply --check classic-menu.patch
+          git apply classic-menu.patch
+          git diff --check
+
+      - name: Install dependencies
+        working-directory: marktext
+        shell: pwsh
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Prepare Electron native dependencies
+        working-directory: marktext
+        shell: pwsh
+        run: pnpm tsx scripts/postinstall.ts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_user_agent: pnpm
+
+      - name: Verify TypeScript
+        working-directory: marktext
+        shell: pwsh
+        run: pnpm --filter marktext typecheck
+
+      - name: Build installer and portable ZIP
+        working-directory: marktext
+        shell: pwsh
+        run: pnpm build:win:x64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          Get-FileHash marktext/dist/*.exe, marktext/dist/*.zip -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } |
+            Set-Content marktext/dist/SHA256SUMS.txt
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MarkText-Classic-Menu-Windows-x64
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            marktext/dist/*.exe
+            marktext/dist/*.zip
+            marktext/dist/SHA256SUMS.txt
