@@ -1,0 +1,2171 @@
+diff --git a/package.json b/package.json
+index 90dd082..265e40b 100644
+--- a/package.json
++++ b/package.json
+@@ -1,9 +1,8 @@
+ {
+-  "name": "marktext-monorepo",
+-  "version": "0.20.0-dev",
+-  "description": "MarkText monorepo root",
++  "name": "medit-monorepo",
++  "version": "0.21.0",
++  "description": "mEdit monorepo root",
+   "private": true,
+-  "homepage": "https://github.com/marktext/marktext",
+   "packageManager": "pnpm@10.33.4",
+   "engines": {
+     "node": ">=20.19.0",
+diff --git a/packages/desktop/electron-builder.yml b/packages/desktop/electron-builder.yml
+index 9a49496..a5fad6b 100755
+--- a/packages/desktop/electron-builder.yml
++++ b/packages/desktop/electron-builder.yml
+@@ -1,5 +1,5 @@
+-appId: com.github.marktext.marktext
+-productName: marktext
++appId: com.jtlsun.medit
++productName: mEdit
+ directories:
+   buildResources: build
+   output: ../../dist
+@@ -53,52 +53,15 @@ electronLanguages: # Avoid packaging all chromium locales since our app has in-b
+ 
+ asarUnpack:
+   - resources/**
+-fileAssociations:
+-  - ext: md
+-    name: Markdown
+-    description: Markdown document
+-    mimeType: text/markdown
+-    role: Editor
+-    icon: icons/md.ico
+-  - ext: markdown
+-    name: Markdown
+-    description: Markdown document
+-    mimeType: text/markdown
+-    role: Editor
+-    icon: icons/md.ico
+-  - ext: mmd
+-    name: Markdown
+-    description: Markdown document
+-    mimeType: text/markdown
+-    role: Editor
+-    icon: icons/md.ico
+-  - ext: mdown
+-    name: Markdown
+-    description: Markdown document
+-    mimeType: text/markdown
+-    role: Editor
+-    icon: icons/md.ico
+-  - ext: mdtxt
+-    name: Markdown
+-    description: Markdown document
+-    mimeType: text/markdown
+-    role: Editor
+-    icon: icons/md.ico
+-  - ext: mdtext
+-    name: Markdown
+-    description: Markdown document
+-    mimeType: text/markdown
+-    role: Editor
+-    icon: icons/md.ico
+ win:
+-  executableName: marktext
+-  artifactName: 'marktext-win-${arch}-${version}.${ext}'
++  executableName: mEdit
++  artifactName: 'mEdit-Windows-${arch}-${version}.${ext}'
+   target:
+     - target: 'nsis'
+     - target: 'zip'
+   icon: static/icon.ico
+ nsis:
+-  artifactName: 'marktext-win-${arch}-${version}-setup.${ext}'
++  artifactName: 'mEdit-Windows-${arch}-${version}-setup.${ext}'
+   shortcutName: ${productName}
+   uninstallDisplayName: ${productName}
+   createDesktopShortcut: true
+@@ -108,7 +71,7 @@ nsis:
+   perMachine: false
+   include: windows/installer.nsh
+ mac:
+-  artifactName: 'marktext-mac-${arch}-${version}.${ext}'
++  artifactName: 'mEdit-mac-${arch}-${version}.${ext}'
+   entitlementsInherit: build/mac/entitlements.mac.plist
+   extendInfo:
+     - NSCameraUsageDescription: Application requests access to the device's camera.
+@@ -120,7 +83,7 @@ mac:
+     - dmg
+     - zip
+ dmg:
+-  artifactName: 'marktext-mac-${arch}-${version}.${ext}'
++  artifactName: 'mEdit-mac-${arch}-${version}.${ext}'
+   contents:
+     - x: 410
+       y: 240
+@@ -130,18 +93,18 @@ dmg:
+       y: 240
+       type: 'file'
+ linux:
+-  artifactName: 'marktext-linux-${version}.${ext}'
+-  executableName: 'marktext'
++  artifactName: 'mEdit-linux-${version}.${ext}'
++  executableName: 'mEdit'
+   description: 'A simple and elegant open-source markdown editor that focused on speed and usability.'
+-  maintainer: 'MarkText Contributors'
++  maintainer: 'mEdit Contributors'
+   category: 'Office;TextEditor;Utility'
+   mimeTypes:
+     - 'text/markdown'
+   icon: 'static/icon.png'
+   desktop:
+     entry:
+-      StartupWMClass: 'marktext'
+-      Keywords: 'marktext;'
++      StartupWMClass: 'mEdit'
++      Keywords: 'mEdit;markdown;editor;'
+   target:
+     - AppImage
+     - snap
+diff --git a/packages/desktop/package.json b/packages/desktop/package.json
+index af7d1f7..18d7ae6 100644
+--- a/packages/desktop/package.json
++++ b/packages/desktop/package.json
+@@ -1,7 +1,8 @@
+ {
+   "name": "marktext",
+-  "version": "0.20.0-dev",
+-  "description": "MarkText",
++  "productName": "mEdit",
++  "version": "0.21.0",
++  "description": "mEdit Markdown editor",
+   "main": "./out/main/index.js",
+   "author": {
+     "name": "Jocs",
+@@ -25,11 +26,6 @@
+       "url": "https://github.com/Tkaixiang"
+     }
+   ],
+-  "homepage": "https://github.com/marktext/marktext",
+-  "repository": {
+-    "type": "git",
+-    "url": "git+https://github.com/marktext/marktext.git"
+-  },
+   "scripts": {
+     "minify-locales": "tsx ../../scripts/minify-locales.ts",
+     "rebuild-native": "electron-rebuild -f",
+diff --git a/packages/desktop/src/main/cli/index.ts b/packages/desktop/src/main/cli/index.ts
+index 04edb38..0846481 100644
+--- a/packages/desktop/src/main/cli/index.ts
++++ b/packages/desktop/src/main/cli/index.ts
+@@ -11,13 +11,13 @@ const writeLine = (s: string): boolean => write(s + '\n')
+ const cli = (): ParsedArgs => {
+   let argv = process.argv.slice(1)
+   if (process.env.NODE_ENV === 'development') {
+-    // Don't pass electron development arguments to MarkText and change user data path.
+-    argv = ['--user-data-dir', path.join(getPath('appData'), 'marktext-dev')]
++    // Don't pass Electron development arguments to mEdit and change user data path.
++    argv = ['--user-data-dir', path.join(getPath('appData'), 'medit-dev')]
+   }
+ 
+   const args = parseArgs(argv, true)
+   if (args['--help']) {
+-    write(`Usage: marktext [commands] [path ...]
++    write(`Usage: mEdit [commands] [path ...]
+ 
+   Available commands:
+ 
+@@ -35,7 +35,7 @@ const cli = (): ParsedArgs => {
+   }
+ 
+   if (args['--version']) {
+-    writeLine(`MarkText: ${MARKTEXT_VERSION_STRING}`)
++    writeLine(`mEdit: ${MARKTEXT_VERSION_STRING}`)
+     writeLine(`Node.js: ${process.versions.node}`)
+     writeLine(`Electron: ${process.versions.electron}`)
+     writeLine(`Chromium: ${process.versions.chrome}`)
+@@ -46,7 +46,7 @@ const cli = (): ParsedArgs => {
+   // Check for portable mode and ensure the user data path is absolute. We assume
+   // that the path is writable if not this lead to an application crash.
+   if (!args['--user-data-dir']) {
+-    const portablePath = path.join(app.getAppPath(), '..', '..', 'marktext-user-data')
++    const portablePath = path.join(app.getAppPath(), '..', '..', 'medit-user-data')
+     if (isDirectory(portablePath)) {
+       args['--user-data-dir'] = portablePath
+     }
+diff --git a/packages/desktop/src/main/config.ts b/packages/desktop/src/main/config.ts
+index 7645416..c271d1c 100644
+--- a/packages/desktop/src/main/config.ts
++++ b/packages/desktop/src/main/config.ts
+@@ -79,7 +79,6 @@ export const LINE_ENDING_REG = /(?:\r\n|\n)/g
+ export const LF_LINE_ENDING_REG = /(?:[^\r]\n)|(?:^\n$)/
+ export const CRLF_LINE_ENDING_REG = /\r\n/
+ 
+-export const GITHUB_REPO_URL = 'https://github.com/marktext/marktext'
+ // copy from muya
+ export const URL_REG =
+   /^http(s)?:\/\/([a-z0-9\-._~]+\.[a-z]{2,}|[0-9.]+|localhost|\[[a-f0-9.:]+\])(:[0-9]{1,5})?(\/[\S]+)?/i
+diff --git a/packages/desktop/src/main/dataCenter/schema.json b/packages/desktop/src/main/dataCenter/schema.json
+index 1932ace..65b6a69 100644
+--- a/packages/desktop/src/main/dataCenter/schema.json
++++ b/packages/desktop/src/main/dataCenter/schema.json
+@@ -8,7 +8,7 @@
+     "type": "string"
+   },
+   "webImages": {
+-    "description": "Images from web which you used in MarkText",
++    "description": "Images from web which you used in mEdit",
+     "type": "array"
+   },
+   "cloudImages": {
+diff --git a/packages/desktop/src/main/editorBufferStore/schema.json b/packages/desktop/src/main/editorBufferStore/schema.json
+index 71c571f..d2a174b 100644
+--- a/packages/desktop/src/main/editorBufferStore/schema.json
++++ b/packages/desktop/src/main/editorBufferStore/schema.json
+@@ -8,7 +8,7 @@
+     "type": "string"
+   },
+   "webImages": {
+-    "description": "Images from web which you used in MarkText",
++    "description": "Images from web which you used in mEdit",
+     "type": "array"
+   },
+   "cloudImages": {
+diff --git a/packages/desktop/src/main/exceptionHandler.ts b/packages/desktop/src/main/exceptionHandler.ts
+index 8aceedf..69f6316 100644
+--- a/packages/desktop/src/main/exceptionHandler.ts
++++ b/packages/desktop/src/main/exceptionHandler.ts
+@@ -9,7 +9,6 @@
+ import { app, clipboard, crashReporter, dialog, ipcMain } from 'electron'
+ import os from 'os'
+ import log from 'electron-log'
+-import { createAndOpenGitHubIssueUrl } from './utils/createGitHubIssue'
+ import { t } from './i18n'
+ 
+ type ErrorType = 'main' | 'renderer'
+@@ -38,8 +37,8 @@ const exceptionToString = (error: Error, type: ErrorType): string => {
+   )
+ }
+ 
+-const handleError = async(title: string, error: Error, type: ErrorType): Promise<void> => {
+-  const { message, stack } = error
++const handleError = async (title: string, error: Error, type: ErrorType): Promise<void> => {
++  const { stack } = error
+ 
+   // Write error into file
+   if (type === 'main') {
+@@ -64,7 +63,7 @@ const handleError = async(title: string, error: Error, type: ErrorType): Promise
+     // Blocking message box
+     const { response } = await dialog.showMessageBox({
+       type: 'error',
+-      buttons: [t('common.ok'), t('error.copyError'), t('error.report')],
++      buttons: [t('common.ok'), t('error.copyError')],
+       defaultId: 0,
+       noLink: true,
+       message: title,
+@@ -76,29 +75,6 @@ const handleError = async(title: string, error: Error, type: ErrorType): Promise
+         clipboard.writeText(`${title}\n${stack}`)
+         break
+       }
+-      case 2: {
+-        const issueTitle = message ? t('error.unexpectedErrorWithMessage', { message }) : title
+-        createAndOpenGitHubIssueUrl(
+-          issueTitle,
+-          `### Description
+-
+-${title}.
+-
+-### Minimal Reprouducible Markdown Example (or Steps)
+-
+-<Add steps or a markdown example to reproduce the problem.>
+-
+-### Stack Trace
+-
+-\`\`\`\n${stack}\n\`\`\`
+-
+-### Version
+-
+-MarkText: ${MARKTEXT_VERSION_STRING}
+-Operating system: ${getOSInformation()}`
+-        )
+-        break
+-      }
+     }
+   } else {
+     // error during Electron initialization
+@@ -127,8 +103,8 @@ const setupExceptionHandler = (): void => {
+ 
+   // start crashReporter to save core dumps to temporary folder
+   crashReporter.start({
+-    companyName: 'marktext',
+-    productName: 'marktext',
++    companyName: 'mEdit',
++    productName: 'mEdit',
+     submitURL: 'http://0.0.0.0/',
+     uploadToServer: false,
+     compress: true
+diff --git a/packages/desktop/src/main/index.ts b/packages/desktop/src/main/index.ts
+index 5687227..f3a871d 100644
+--- a/packages/desktop/src/main/index.ts
++++ b/packages/desktop/src/main/index.ts
+@@ -53,7 +53,7 @@ initializeLogger(appEnvironment)
+ // Handles native level crashes
+ crashReporter.start({
+   companyName: '',
+-  productName: 'marktext',
++  productName: 'mEdit',
+   uploadToServer: false, // collect locally
+   compress: true
+ })
+@@ -83,7 +83,7 @@ if (!process.mas && process.env.NODE_ENV !== 'development') {
+ registerSandboxIpcHandlers()
+ 
+ // Windows-specific AppUserModelID
+-electronApp.setAppUserModelId('com.electron.marktext')
++electronApp.setAppUserModelId('com.jtlsun.medit')
+ 
+ // Dev shortcuts and reload suppression
+ app.on('browser-window-created', (_, window) => {
+diff --git a/packages/desktop/src/main/menu/actions/file.ts b/packages/desktop/src/main/menu/actions/file.ts
+index 4ff5430..e972286 100644
+--- a/packages/desktop/src/main/menu/actions/file.ts
++++ b/packages/desktop/src/main/menu/actions/file.ts
+@@ -12,7 +12,7 @@ import {
+ import log from 'electron-log'
+ import { isDirectory, isFile, exists } from 'common/filesystem'
+ import { MARKDOWN_EXTENSIONS, isDangerousExecutableFile, isMarkdownFile } from 'common/filesystem/paths'
+-import { checkUpdates, userSetting } from './marktext'
++import { userSetting } from './marktext'
+ import { showTabBar } from './view'
+ import { COMMANDS } from '../../commands'
+ import type { CommandManager } from '../../commands'
+@@ -174,7 +174,7 @@ const handleResponseForSave = async(
+ 
+   // If the file doesn't exist on disk add it to the recently used documents later
+   // and execute file from filesystem watcher for a short time. The file may exists
+-  // on disk nevertheless but is already tracked by MarkText.
++  // on disk nevertheless but is already tracked by mEdit.
+   const alreadyExistOnDisk = !!pathname
+ 
+   let filePath = pathname
+@@ -358,7 +358,7 @@ ipcMain.on(
+ 
+     // If the file doesn't exist on disk add it to the recently used documents later
+     // and execute file from filesystem watcher for a short time. The file may exists
+-    // on disk nevertheless but is already tracked by MarkText.
++    // on disk nevertheless but is already tracked by mEdit.
+     const alreadyExistOnDisk = !!pathname
+ 
+     let { filePath, canceled } = await dialog.showSaveDialog(win, {
+@@ -621,7 +621,7 @@ ipcMain.on('mt::format-link-click', async(e, { data, dirname }: FormatLinkPayloa
+   }
+ 
+   if (pathname) {
+-    // decodeURIComponent() CommonMark #503, allow percent encoded path names to open files. https://github.com/marktext/marktext/issues/57
++    // Allow percent-encoded path names to open files.
+     pathname = path.normalize(decodeURIComponent(pathname))
+     if (isMarkdownFile(pathname)) {
+       const innerWin = BrowserWindow.fromWebContents(e.sender)
+@@ -829,7 +829,6 @@ export const clearRecentlyUsed = (): void => {
+ // --- Commands -------------------------------------------------------------
+ 
+ export const loadFileCommands = (commandManager: CommandManager): void => {
+-  commandManager.add(COMMANDS.FILE_CHECK_UPDATE, checkUpdates)
+   commandManager.add(COMMANDS.FILE_CLOSE_TAB, closeTab)
+   commandManager.add(COMMANDS.FILE_CLOSE_WINDOW, closeWindow)
+   commandManager.add(COMMANDS.FILE_EXPORT_FILE, exportFile)
+diff --git a/packages/desktop/src/main/menu/actions/marktext.ts b/packages/desktop/src/main/menu/actions/marktext.ts
+index 8e46f3d..60c4fb0 100644
+--- a/packages/desktop/src/main/menu/actions/marktext.ts
++++ b/packages/desktop/src/main/menu/actions/marktext.ts
+@@ -1,83 +1,12 @@
+-import { autoUpdater } from 'electron-updater'
+-import { BrowserWindow, Menu, ipcMain } from 'electron'
++import { Menu, ipcMain } from 'electron'
+ import { COMMANDS } from '../../commands'
+ import type { CommandManager } from '../../commands'
+ import { isOsx } from '../../config'
+ 
+-let runningUpdate = false
+-let win: BrowserWindow | null = null
+-
+-autoUpdater.autoDownload = false
+-
+-autoUpdater.on('error', (error: Error) => {
+-  if (win) {
+-    // Preserve the JS behavior: it tolerated `null` here; the typed event
+-    // shape doesn't, but the same defensive code below stays in place.
+-    const err = error as Error | null
+-    win.webContents.send(
+-      'mt::UPDATE_ERROR',
+-      err === null ? 'Error: unknown' : (err.message || err).toString()
+-    )
+-  }
+-})
+-
+-autoUpdater.on('update-available', (_info) => {
+-  if (win) {
+-    win.webContents.send(
+-      'mt::UPDATE_AVAILABLE',
+-      'Found an update, do you want download and install now?'
+-    )
+-  }
+-  runningUpdate = false
+-})
+-
+-autoUpdater.on('update-not-available', (_info) => {
+-  if (win) {
+-    win.webContents.send('mt::UPDATE_NOT_AVAILABLE', 'Current version is up-to-date.')
+-  }
+-  runningUpdate = false
+-})
+-
+-autoUpdater.on('update-downloaded', (_event) => {
+-  // TODO: We should ask the user, so that the user can save all documents and
+-  // not just force close the application.
+-
+-  if (win) {
+-    win.webContents.send(
+-      'mt::UPDATE_DOWNLOADED',
+-      'Update downloaded, application will be quit for update...'
+-    )
+-  }
+-  setImmediate(() => autoUpdater.quitAndInstall())
+-})
+-
+-ipcMain.on('mt::NEED_UPDATE', (_e, { needUpdate }: { needUpdate: boolean }) => {
+-  if (needUpdate) {
+-    autoUpdater.downloadUpdate()
+-  } else {
+-    runningUpdate = false
+-  }
+-})
+-
+-ipcMain.on('mt::check-for-update', (e) => {
+-  const senderWin = BrowserWindow.fromWebContents(e.sender)
+-  checkUpdates(senderWin)
+-})
+-
+-// --------------------------------------------------------
+-
+ export const userSetting = (): void => {
+   ipcMain.emit('app-create-settings-window')
+ }
+ 
+-export const checkUpdates = (browserWindow: BrowserWindow | null): void => {
+-  if (!runningUpdate) {
+-    runningUpdate = true
+-    win = browserWindow
+-    autoUpdater.checkForUpdates()
+-  }
+-}
+-
+ export const osxHide = (): void => {
+   if (isOsx) {
+     Menu.sendActionToFirstResponder('hide:')
+diff --git a/packages/desktop/src/main/menu/templates/help.ts b/packages/desktop/src/main/menu/templates/help.ts
+index 255cfd2..36b5c81 100755
+--- a/packages/desktop/src/main/menu/templates/help.ts
++++ b/packages/desktop/src/main/menu/templates/help.ts
+@@ -1,128 +1,18 @@
+-import path from 'path'
+-import { shell, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
+-import { isFile } from 'common/filesystem'
++import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
+ import * as actions from '../actions/help'
+-import { checkUpdates } from '../actions/marktext'
+ import { t } from '../../i18n'
+ 
+-/// Check whether the package is updatable at runtime.
+-const isUpdatable = (): boolean => {
+-  // TODO: If not updatable, allow to check whether there is a new version available.
+-
+-  const resFile = isFile(path.join(process.resourcesPath, 'app-update.yml'))
+-  if (!resFile) {
+-    // No update resource file available.
+-    return false
+-  } else if (process.env.APPIMAGE) {
+-    // We are running as AppImage.
+-    return true
+-  } else if (process.platform === 'win32' && isFile(path.join(process.resourcesPath, 'md.ico'))) {
+-    // Windows is a little but tricky. The update resource file is always available and
+-    // there is no way to check the target type at runtime (electron-builder#4119).
+-    // As workaround we check whether "md.ico" exists that is only included in the setup.
+-    return true
+-  }
+-
+-  // Otherwise assume that we cannot perform an auto update (standalone binary, archives,
+-  // packed for package manager).
+-  return false
+-}
+-
+ export default function(): MenuItemConstructorOptions {
+-  const submenu: MenuItemConstructorOptions[] = [
+-    {
+-      label: t('menu.help.markdownReference'),
+-      click() {
+-        shell.openExternal(
+-          'https://marktext.me/docs/markdown-syntax'
+-        )
+-      }
+-    },
+-    {
+-      label: t('menu.help.changelog'),
+-      click() {
+-        shell.openExternal('https://github.com/marktext/marktext/releases')
+-      }
+-    },
+-    {
+-      type: 'separator'
+-    },
+-    {
+-      label: t('menu.help.followUs'),
+-      click() {
+-        shell.openExternal('https://twitter.com/marktextapp')
+-      }
+-    },
+-    {
+-      label: t('menu.help.support'),
+-      click() {
+-        shell.openExternal('https://github.com/sponsors/marktext')
+-      }
+-    },
+-    {
+-      type: 'separator'
+-    },
+-    {
+-      label: t('menu.help.askQuestion'),
+-      click() {
+-        shell.openExternal('https://github.com/marktext/marktext/discussions')
+-      }
+-    },
+-    {
+-      label: t('menu.help.reportBug'),
+-      click() {
+-        shell.openExternal('https://github.com/marktext/marktext/issues')
+-      }
+-    },
+-    {
+-      label: t('menu.help.viewSource'),
+-      click() {
+-        shell.openExternal('https://github.com/marktext/marktext')
+-      }
+-    },
+-    {
+-      type: 'separator'
+-    },
+-    {
+-      label: t('menu.help.license'),
+-      click() {
+-        shell.openExternal('https://github.com/marktext/marktext/blob/develop/LICENSE')
+-      }
+-    }
+-  ]
+-
+-  const helpMenu: MenuItemConstructorOptions = {
++  return {
+     label: t('menu.help.help'),
+     role: 'help',
+-    submenu
+-  }
+-
+-  if (isUpdatable()) {
+-    submenu.push(
+-      {
+-        type: 'separator'
+-      },
+-      {
+-        label: t('menu.help.checkUpdates'),
+-        click(_menuItem, browserWindow) {
+-          checkUpdates((browserWindow as BrowserWindow | undefined) ?? null)
+-        }
+-      }
+-    )
+-  }
+-
+-  if (process.platform !== 'darwin') {
+-    submenu.push(
+-      {
+-        type: 'separator'
+-      },
++    submenu: [
+       {
+         label: t('menu.help.about'),
+         click(_menuItem, browserWindow) {
+           actions.showAboutDialog(browserWindow as BrowserWindow | undefined)
+         }
+       }
+-    )
++    ]
+   }
+-  return helpMenu
+ }
+diff --git a/packages/desktop/src/main/menu/templates/marktext.ts b/packages/desktop/src/main/menu/templates/marktext.ts
+index 07c29d6..c0a52ae 100755
+--- a/packages/desktop/src/main/menu/templates/marktext.ts
++++ b/packages/desktop/src/main/menu/templates/marktext.ts
+@@ -16,12 +16,6 @@ export default function(keybindings: Keybindings): MenuItemConstructorOptions {
+           showAboutDialog(focusedWindow as BrowserWindow | undefined)
+         }
+       },
+-      {
+-        label: t('menu.marktext.checkUpdates'),
+-        click(_menuItem, focusedWindow) {
+-          actions.checkUpdates((focusedWindow as BrowserWindow | undefined) ?? null)
+-        }
+-      },
+       {
+         label: t('menu.marktext.preferences'),
+         accelerator: keybindings.getAccelerator('file.preferences') ?? undefined,
+diff --git a/packages/desktop/src/main/preferences/index.ts b/packages/desktop/src/main/preferences/index.ts
+index 891cabd..56759f8 100644
+--- a/packages/desktop/src/main/preferences/index.ts
++++ b/packages/desktop/src/main/preferences/index.ts
+@@ -50,6 +50,15 @@ class Preference extends TypedEmitter<PreferenceEvents> {
+           if (store.get('startUpAction') === 'lastState') {
+             store.set('startUpAction', 'openLastFolder')
+           }
++        },
++        // This variant replaces the hidden hamburger menu with the familiar
++        // operating-system menu bar. Apply the new default once for people
++        // upgrading from the last stable MarkText release; they can still
++        // choose the custom title bar again afterwards.
++        '0.19.0': (store) => {
++          if (store.get('titleBarStyle') === 'custom') {
++            store.set('titleBarStyle', 'native')
++          }
+         }
+       },
+       beforeEachMigration: (_store, context) => {
+diff --git a/packages/desktop/src/main/preferences/schema.json b/packages/desktop/src/main/preferences/schema.json
+index c202785..d0a83dd 100644
+--- a/packages/desktop/src/main/preferences/schema.json
++++ b/packages/desktop/src/main/preferences/schema.json
+@@ -13,7 +13,7 @@
+   "titleBarStyle": {
+     "description": "General--The title bar style (Windows and Linux system only).",
+     "enum": ["custom", "native"],
+-    "default": "custom"
++    "default": "native"
+   },
+   "openFilesInNewWindow": {
+     "description": "General--Open files in a new window.",
+@@ -54,11 +54,11 @@
+     "default": "asc"
+   },
+   "lastOpenedFolder": {
+-    "description": "General--The last folder that was opened in MarkText.--internal",
++    "description": "General--The last folder that was opened in mEdit.--internal",
+     "type": "string"
+   },
+   "startUpAction": {
+-    "description": "General--The action after MarkText startup, open the last opened folder, open the specified folder or blank page",
++    "description": "General--The action after mEdit startup, open the last opened folder, open the specified folder or blank page",
+     "enum": ["folder", "openLastFolder", "blank", "restoreAll"],
+     "default": "restoreAll"
+   },
+@@ -67,7 +67,7 @@
+     "type": "string"
+   },
+   "language": {
+-    "description": "General--The language MarkText uses.",
++    "description": "General--The language mEdit uses.",
+     "type": "string",
+     "default": "en"
+   },
+@@ -238,7 +238,7 @@
+     "default": "."
+   },
+   "preferHeadingStyle": {
+-    "description": "Markdown--The preferred heading style in MarkText",
++    "description": "Markdown--The preferred heading style in mEdit",
+     "enum": ["atx", "setext"],
+     "default": "atx"
+   },
+@@ -289,7 +289,7 @@
+     "default": "https://www.plantuml.com/plantuml"
+   },
+   "theme": {
+-    "description": "Theme--Select the theme used in MarkText",
++    "description": "Theme--Select the theme used in mEdit",
+     "type": "string",
+     "default": "light"
+   },
+diff --git a/packages/desktop/src/main/utils/createGitHubIssue.ts b/packages/desktop/src/main/utils/createGitHubIssue.ts
+deleted file mode 100644
+index bf2f80d..0000000
+--- a/packages/desktop/src/main/utils/createGitHubIssue.ts
++++ /dev/null
+@@ -1,17 +0,0 @@
+-import { shell } from 'electron'
+-import { GITHUB_REPO_URL } from '../config'
+-
+-export const createGitHubIssueUrl = (title?: string, msg?: string): string => {
+-  const issueUrl = new URL(`${GITHUB_REPO_URL}/issues/new`)
+-  if (title) {
+-    issueUrl.searchParams.set('title', title)
+-  }
+-  if (msg) {
+-    issueUrl.searchParams.set('body', msg)
+-  }
+-  return issueUrl.toString()
+-}
+-
+-export const createAndOpenGitHubIssueUrl = (title?: string, msg?: string): void => {
+-  shell.openExternal(createGitHubIssueUrl(title, msg))
+-}
+diff --git a/packages/desktop/src/main/windows/editor.ts b/packages/desktop/src/main/windows/editor.ts
+index 868462b..17c3aee 100644
+--- a/packages/desktop/src/main/windows/editor.ts
++++ b/packages/desktop/src/main/windows/editor.ts
+@@ -203,7 +203,7 @@ class EditorWindow extends BaseWindow {
+       )
+     })
+ 
+-    win.webContents.once('render-process-gone', async(_event, { reason }) => {
++    win.webContents.once('render-process-gone', async (_event, { reason }) => {
+       if (reason === 'clean-exit') {
+         return
+       }
+@@ -218,7 +218,7 @@ class EditorWindow extends BaseWindow {
+       const { response } = await dialog.showMessageBox(win!, {
+         type: 'warning',
+         buttons: ['Close', 'Reload', 'Keep It Open'],
+-        message: 'MarkText has crashed',
++        message: 'mEdit has crashed',
+         detail: msg
+       })
+ 
+diff --git a/packages/desktop/src/renderer/index.html b/packages/desktop/src/renderer/index.html
+index fe0c102..9aab5a5 100644
+--- a/packages/desktop/src/renderer/index.html
++++ b/packages/desktop/src/renderer/index.html
+@@ -2,7 +2,7 @@
+ <html>
+   <head>
+     <meta charset="UTF-8" />
+-    <title>MarkText</title>
++    <title>mEdit</title>
+     <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+     <meta
+       http-equiv="Content-Security-Policy"
+diff --git a/packages/desktop/src/renderer/src/codeMirror/markdownMathMode.ts b/packages/desktop/src/renderer/src/codeMirror/markdownMathMode.ts
+index 3295b19..2ce9755 100644
+--- a/packages/desktop/src/renderer/src/codeMirror/markdownMathMode.ts
++++ b/packages/desktop/src/renderer/src/codeMirror/markdownMathMode.ts
+@@ -3,7 +3,7 @@
+ // stex (LaTeX) mode. Without this wrapper the standard markdown mode highlights
+ // `_` as emphasis delimiters even inside math, producing spurious italics for
+ // subscript expressions like `$\text{F}_\text{A} = \text{F}_\text{B}$` in the
+-// source view. See https://github.com/marktext/marktext/issues/4121.
++// source view.
+ //
+ // The outer mode is `gfm` to preserve the tables / autolinks / task lists
+ // styling the previous `setMode(cm, 'markdown')` call resolved to via
+diff --git a/packages/desktop/src/renderer/src/commands/index.ts b/packages/desktop/src/renderer/src/commands/index.ts
+index 2528d60..8efd0a3 100644
+--- a/packages/desktop/src/renderer/src/commands/index.ts
++++ b/packages/desktop/src/renderer/src/commands/index.ts
+@@ -1,7 +1,6 @@
+ // List of all static commands that are loaded into command center.
+ import bus from '../bus'
+ import { delay, isOsx } from '@/util'
+-import { isUpdatable } from './utils'
+ import getCommandDescriptionById from './descriptions'
+ import { t } from '../i18n'
+ 
+@@ -632,7 +631,7 @@ const commands: CommandDescriptor[] = [
+   },
+ 
+   // --------------------------------------------------------------------------
+-  // MarkText
++  // mEdit
+ 
+   {
+     id: 'file.preferences',
+@@ -646,23 +645,6 @@ const commands: CommandDescriptor[] = [
+       window.electron.ipcRenderer.send('mt::app-try-quit')
+     }
+   },
+-  {
+-    id: 'docs.user-guide',
+-    execute: async() => {
+-      window.electron.shell.openExternal(
+-        'https://marktext.me/docs/basics'
+-      )
+-    }
+-  },
+-  {
+-    id: 'docs.markdown-syntax',
+-    execute: async() => {
+-      window.electron.shell.openExternal(
+-        'https://marktext.me/docs/markdown-syntax'
+-      )
+-    }
+-  },
+-
+   // --------------------------------------------------------------------------
+   // Misc
+ 
+@@ -683,16 +665,6 @@ const commands: CommandDescriptor[] = [
+ // --------------------------------------------------------------------------
+ // etc
+ 
+-if (isUpdatable()) {
+-  commands.push({
+-    id: 'file.check-update',
+-    description: getCommandDescriptionById('file.check-update'),
+-    execute: async() => {
+-      window.electron.ipcRenderer.send('mt::check-for-update')
+-    }
+-  })
+-}
+-
+ if (isOsx) {
+   commands.push({
+     id: 'edit.screenshot',
+diff --git a/packages/desktop/src/renderer/src/components/about/index.vue b/packages/desktop/src/renderer/src/components/about/index.vue
+index 29d99c1..f533df8 100644
+--- a/packages/desktop/src/renderer/src/components/about/index.vue
++++ b/packages/desktop/src/renderer/src/components/about/index.vue
+@@ -7,10 +7,7 @@
+       custom-class="ag-dialog-table"
+       width="400px"
+     >
+-      <img
+-        class="logo"
+-        :src="MarkTextLogo"
+-      >
++      <img class="logo" :src="mEditLogo" />
+       <el-row>
+         <el-col :span="24">
+           <h3 class="title">
+@@ -22,19 +19,6 @@
+             {{ store.appVersion }}
+           </div>
+         </el-col>
+-        <el-col :span="24">
+-          <div
+-            class="text"
+-            style="min-height: auto"
+-          >
+-            {{ copyright }}
+-          </div>
+-        </el-col>
+-        <el-col :span="24">
+-          <div class="text">
+-            {{ copyrightContributors }}
+-          </div>
+-        </el-col>
+       </el-row>
+     </el-dialog>
+   </div>
+@@ -44,14 +28,8 @@
+ import { ref, onMounted, onBeforeUnmount } from 'vue'
+ import { useMainStore } from '@/store'
+ import bus from '../../bus'
+-import MarkTextLogo from '../../assets/images/logo.png'
+-import { useI18n } from 'vue-i18n'
+-
+-const { t } = useI18n()
+-
+-const name = 'MarkText'
+-const copyright = t('about.copyright', { year: new Date().getFullYear() })
+-const copyrightContributors = t('about.copyrightContributors')
++import mEditLogo from '../../assets/images/logo.png'
++const name = 'mEdit'
+ const showAboutDialog = ref(false)
+ 
+ const store = useMainStore()
+diff --git a/packages/desktop/src/renderer/src/components/editorWithTabs/editor.vue b/packages/desktop/src/renderer/src/components/editorWithTabs/editor.vue
+index 6d2999b..cfb4625 100644
+--- a/packages/desktop/src/renderer/src/components/editorWithTabs/editor.vue
++++ b/packages/desktop/src/renderer/src/components/editorWithTabs/editor.vue
+@@ -2089,6 +2089,10 @@ onBeforeUnmount(() => {
+ .editor-component .mu-container {
+   padding-top: 20px;
+   padding-bottom: 100vh;
++  /* Keep the readable document width, but anchor it to the left edge of the
++     editor instead of centering it in wide windows. */
++  margin-left: 0;
++  margin-right: auto;
+ }
+ 
+ .typewriter .editor-component {
+diff --git a/packages/desktop/src/renderer/src/components/editorWithTabs/sourceCode.vue b/packages/desktop/src/renderer/src/components/editorWithTabs/sourceCode.vue
+index c685c33..8953880 100644
+--- a/packages/desktop/src/renderer/src/components/editorWithTabs/sourceCode.vue
++++ b/packages/desktop/src/renderer/src/components/editorWithTabs/sourceCode.vue
+@@ -423,7 +423,7 @@ onBeforeUnmount(() => {
+ }
+ .source-code .CodeMirror {
+   height: auto;
+-  margin: 50px auto;
++  margin: 50px 0;
+   max-width: var(--editorAreaWidth);
+   background: transparent;
+ }
+diff --git a/packages/desktop/src/renderer/src/components/exportSettings/index.vue b/packages/desktop/src/renderer/src/components/exportSettings/index.vue
+index 9bb218e..88ec4a6 100644
+--- a/packages/desktop/src/renderer/src/components/exportSettings/index.vue
++++ b/packages/desktop/src/renderer/src/components/exportSettings/index.vue
+@@ -163,7 +163,6 @@
+           </div>
+           <cur-select
+             :description="t('exportSettings.theme.theme')"
+-            more="https://marktext.me/docs/export-themes"
+             :value="theme"
+             :options="themeList"
+             :on-change="(value: unknown) => onSelectChange('theme', value)"
+diff --git a/packages/desktop/src/renderer/src/components/titleBar/index.vue b/packages/desktop/src/renderer/src/components/titleBar/index.vue
+index 57498ec..96cf493 100644
+--- a/packages/desktop/src/renderer/src/components/titleBar/index.vue
++++ b/packages/desktop/src/renderer/src/components/titleBar/index.vue
+@@ -1,10 +1,6 @@
+ <template>
+   <div>
+-    <div
+-      v-if="showTitleBar"
+-      class="title-bar-editor-bg"
+-      :class="{ 'tabs-visible': showTabBar }"
+-    />
++    <div v-if="showTitleBar" class="title-bar-editor-bg" :class="{ 'tabs-visible': showTabBar }" />
+     <div
+       v-if="showTitleBar"
+       class="title-bar"
+@@ -15,35 +11,19 @@
+         { isOsx: isOsx }
+       ]"
+     >
+-      <div
+-        class="title"
+-        @dblclick.stop="toggleMaxmizeOnMacOS"
+-      >
+-        <span v-if="!filename">MarkText</span>
++      <div class="title" @dblclick.stop="toggleMaxmizeOnMacOS">
++        <span v-if="!filename">mEdit</span>
+         <span v-else>
+-          <span
+-            v-for="(path, index) of paths"
+-            :key="index"
+-          >
++          <span v-for="(path, index) of paths" :key="index">
+             {{ path }}
+-            <el-icon
+-              class="path-arrow"
+-              :size="12"
+-            >
++            <el-icon class="path-arrow" :size="12">
+               <ArrowRight />
+             </el-icon>
+           </span>
+-          <span
+-            class="filename"
+-            :class="{ isOsx: platform === 'darwin' }"
+-            @click="rename"
+-          >
++          <span class="filename" :class="{ isOsx: platform === 'darwin' }" @click="rename">
+             {{ filename }}
+           </span>
+-          <span
+-            class="save-dot"
+-            :class="{ show: !isSaved }"
+-          />
++          <span class="save-dot" :class="{ show: !isSaved }" />
+         </span>
+       </div>
+       <div :class="showCustomTitleBar ? 'left-toolbar title-no-drag' : 'right-toolbar'">
+@@ -62,20 +42,19 @@
+         >
+           <template #content>
+             <div class="title-item">
+-              <span class="front">{{ t('menu.counter.words') }}:</span><span class="text">{{ wordCount['word'] }}</span>
++              <span class="front">{{ t('menu.counter.words') }}:</span
++              ><span class="text">{{ wordCount['word'] }}</span>
+             </div>
+             <div class="title-item">
+-              <span class="front">{{ t('menu.counter.characters') }}:</span><span class="text">{{ wordCount['character'] }}</span>
++              <span class="front">{{ t('menu.counter.characters') }}:</span
++              ><span class="text">{{ wordCount['character'] }}</span>
+             </div>
+             <div class="title-item">
+-              <span class="front">{{ t('menu.counter.paragraphs') }}:</span><span class="text">{{ wordCount['paragraph'] }}</span>
++              <span class="front">{{ t('menu.counter.paragraphs') }}:</span
++              ><span class="text">{{ wordCount['paragraph'] }}</span>
+             </div>
+           </template>
+-          <div
+-            v-if="wordCount"
+-            class="word-count"
+-            @click.stop="handleWordClick"
+-          >
++          <div v-if="wordCount" class="word-count" @click.stop="handleWordClick">
+             <span class="text-center-vertical">{{ `${HASH[show].short} ${wordCount[show]}` }}</span>
+           </div>
+         </el-tooltip>
+@@ -90,10 +69,7 @@
+           @click.stop="handleCloseClick"
+         >
+           <div>
+-            <svg
+-              width="10"
+-              height="10"
+-            >
++            <svg width="10" height="10">
+               <path :d="windowIconClose" />
+             </svg>
+           </div>
+@@ -103,18 +79,9 @@
+           @click.stop="handleMaximizeClick"
+         >
+           <div>
+-            <svg
+-              width="10"
+-              height="10"
+-            >
+-              <path
+-                v-show="!isMaximized"
+-                :d="windowIconMaximize"
+-              />
+-              <path
+-                v-show="isMaximized"
+-                :d="windowIconRestore"
+-              />
++            <svg width="10" height="10">
++              <path v-show="!isMaximized" :d="windowIconMaximize" />
++              <path v-show="isMaximized" :d="windowIconRestore" />
+             </svg>
+           </div>
+         </div>
+@@ -123,10 +90,7 @@
+           @click.stop="handleMinimizeClick"
+         >
+           <div>
+-            <svg
+-              width="10"
+-              height="10"
+-            >
++            <svg width="10" height="10">
+               <path :d="windowIconMinimize" />
+             </svg>
+           </div>
+diff --git a/packages/desktop/src/renderer/src/prefComponents/image/components/folderSetting/index.vue b/packages/desktop/src/renderer/src/prefComponents/image/components/folderSetting/index.vue
+index 656a358..9634fa4 100644
+--- a/packages/desktop/src/renderer/src/prefComponents/image/components/folderSetting/index.vue
++++ b/packages/desktop/src/renderer/src/prefComponents/image/components/folderSetting/index.vue
+@@ -28,7 +28,6 @@
+       <template #head>
+         <bool
+           :description="t('preferences.image.folderSetting.preferRelative')"
+-          more="https://marktext.me/docs/images"
+           :bool="imagePreferRelativeDirectory"
+           :on-change="(value) => onSelectChange('imagePreferRelativeDirectory', value)"
+         />
+diff --git a/packages/desktop/src/renderer/src/prefComponents/keybindings/index.vue b/packages/desktop/src/renderer/src/prefComponents/keybindings/index.vue
+index 8db2dec..803f2dd 100644
+--- a/packages/desktop/src/renderer/src/prefComponents/keybindings/index.vue
++++ b/packages/desktop/src/renderer/src/prefComponents/keybindings/index.vue
+@@ -4,15 +4,6 @@
+     <section class="keybindings">
+       <div class="text">
+         {{ t('preferences.keybindings.description') }}
+-        <a
+-          class="link"
+-          :title="t('preferences.keybindings.online')"
+-          :aria-label="t('preferences.keybindings.online')"
+-          @click="openKeybindingDocs"
+-        ><LinkIcon
+-          :size="14"
+-          class="link-icon"
+-        /></a>.
+       </div>
+       <el-table
+         :data="keybindingList"
+@@ -117,7 +108,6 @@ import KeybindingConfigurator from './KeybindingConfigurator'
+ import type { UiKeybinding } from './KeybindingConfigurator'
+ import notice from '@/services/notification'
+ import { Edit, RefreshRight, Delete } from '@element-plus/icons-vue'
+-import LinkIcon from '@/components/icons/LinkIcon.vue'
+ import { useI18n } from 'vue-i18n'
+ 
+ const { t, locale } = useI18n()
+@@ -167,12 +157,6 @@ onUnmounted(() => {
+   keybindingConfigurator.value = null
+ })
+ 
+-const openKeybindingDocs = (): void => {
+-  window.electron.shell.openExternal(
+-    'https://marktext.me/docs/key-bindings'
+-  )
+-}
+-
+ const saveKeybindings = (): void => {
+   if (keybindingConfigurator.value && keybindingList.value.length > 0) {
+     keybindingConfigurator.value
+diff --git a/packages/desktop/src/renderer/src/prefComponents/theme/theme.md b/packages/desktop/src/renderer/src/prefComponents/theme/theme.md
+index 9dbe108..17f7bb1 100644
+--- a/packages/desktop/src/renderer/src/prefComponents/theme/theme.md
++++ b/packages/desktop/src/renderer/src/prefComponents/theme/theme.md
+@@ -1,3 +1,3 @@
+ ### {theme}
+ 
+-**Lorem Ipsum** is simply [dummy](http://marktext.app) text of the printing and typesetting industry.
++**Lorem Ipsum** is simply dummy text of the printing and typesetting industry.
+diff --git a/packages/desktop/src/renderer/src/store/preferences.ts b/packages/desktop/src/renderer/src/store/preferences.ts
+index 325dfe2..6e1dc24 100644
+--- a/packages/desktop/src/renderer/src/store/preferences.ts
++++ b/packages/desktop/src/renderer/src/store/preferences.ts
+@@ -141,7 +141,7 @@ export const usePreferencesStore = defineStore('preferences', {
+   state: (): PreferencesState => ({
+     autoSave: false,
+     autoSaveDelay: 5000,
+-    titleBarStyle: 'custom',
++    titleBarStyle: 'native',
+     openFilesInNewWindow: false,
+     openFolderInNewWindow: false,
+     zoom: 1.0,
+diff --git a/packages/desktop/src/types/muya.d.ts b/packages/desktop/src/types/muya.d.ts
+index c0916a7..e59c00b 100644
+--- a/packages/desktop/src/types/muya.d.ts
++++ b/packages/desktop/src/types/muya.d.ts
+@@ -1,7 +1,7 @@
+ /* eslint-disable @typescript-eslint/no-explicit-any --
+  * Bridge to the legacy JavaScript muya/ tree. Every member is intentionally
+  * `any` because the underlying src/muya/ source is .js and won't be re-typed
+- * before the upstream TS muya (https://github.com/marktext/muya) replaces it.
++ * before the upstream TypeScript editor engine replaces it.
+  * Delete this file the day upstream lands; see packages/website/content/docs/dev/TYPESCRIPT.md.
+  */
+ 
+diff --git a/packages/desktop/static/locales/de.json b/packages/desktop/static/locales/de.json
+index bbd1acb..2d22866 100644
+--- a/packages/desktop/static/locales/de.json
++++ b/packages/desktop/static/locales/de.json
+@@ -92,21 +92,21 @@
+       "reportBug": "Fehler melden",
+       "viewSource": "Quellcode anzeigen",
+       "followUs": "Folgen Sie uns",
+-      "support": "MarkText unterstützen",
++      "support": "mEdit unterstützen",
+       "license": "Lizenz",
+       "about": "Über",
+       "checkUpdates": "Updates prüfen"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "Über MarkText",
++      "title": "mEdit",
++      "about": "Über mEdit",
+       "checkUpdates": "Nach Updates suchen...",
+       "preferences": "Einstellungen",
+       "services": "Dienste",
+-      "hide": "MarkText ausblenden",
++      "hide": "mEdit ausblenden",
+       "hideOthers": "Andere ausblenden",
+       "showAll": "Alle anzeigen",
+-      "quit": "MarkText beenden"
++      "quit": "mEdit beenden"
+     },
+     "view": {
+       "view": "Ansicht",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "Importieren oder öffnen",
+-    "description": "Hier hineinziehen, um Ihren Inhalt in MarkText zu importieren"
++    "description": "Hier hineinziehen, um Ihren Inhalt in mEdit zu importieren"
+   },
+   "preferences": {
+     "title": "Einstellungen",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "Ob Scrollbalken ausgeblendet werden sollen",
+         "wordWrapInToc": "Ob Zeilenumbruch im Inhaltsverzeichnis aktiviert werden soll",
+         "fileSortBy": "Dateien im geöffneten Ordner nach Erstellungszeit, Änderungszeit und Titel sortieren",
+-        "startUpAction": "Die Aktion nach MarkText-Start, letzten bearbeiteten Inhalt öffnen, angegebenen Ordner öffnen oder leere Seite",
++        "startUpAction": "Die Aktion nach mEdit-Start, letzten bearbeiteten Inhalt öffnen, angegebenen Ordner öffnen oder leere Seite",
+         "restoreLayoutState": "Vorherigen Editorzustand beim Start wiederherstellen",
+         "defaultDirectoryToOpen": "Das Standard-Verzeichnis, das beim Start geöffnet werden soll, wenn startUp=folder",
+-        "language": "Die Sprache, die MarkText verwendet",
++        "language": "Die Sprache, die mEdit verwendet",
+         "editorFontFamily": "Editor-Schriftfamilie",
+         "fontSize": "Schriftgröße in Pixeln",
+         "lineHeight": "Zeilenhöhe",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "Der bevorzugte Listentyp",
+         "bulletListMarker": "Die Markierung in Aufzählungslisten",
+         "orderListDelimiter": "Das Trennzeichen in geordneten Listen",
+-        "preferHeadingStyle": "Der bevorzugte Überschriften-Stil in MarkText",
++        "preferHeadingStyle": "Der bevorzugte Überschriften-Stil in mEdit",
+         "tabSize": "Tab durch x Leerzeichen ersetzen",
+         "listIndentation": "Einrückung der Liste auswählen",
+         "frontmatterType": "Der Frontmatter-Typ",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "GitLab-Kompatibilitätsmodus aktivieren",
+         "sequenceTheme": "Sequenzdiagramm-Theme",
+         "plantumlServer": "PlantUML-Server-URL",
+-        "theme": "Das in MarkText verwendete Theme auswählen",
++        "theme": "Das in mEdit verwendete Theme auswählen",
+         "followSystemTheme": "Systemdesign folgen",
+         "lightModeTheme": "Design, das verwendet werden soll, wenn sich das System im hellen Modus befindet",
+         "darkModeTheme": "Design, das verwendet werden soll, wenn sich das System im dunklen Modus befindet",
+@@ -616,7 +616,7 @@
+         "neverDetected": "Nie erkannt",
+         "neverSuccessful": "Nie erfolgreich"
+       },
+-      "defaultBehavior": "Standardverhalten nach dem Einfügen oder Ziehen eines Bildes in MarkText"
++      "defaultBehavior": "Standardverhalten nach dem Einfügen oder Ziehen eines Bildes in mEdit"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "MarkText ausblenden",
++      "hide": "mEdit ausblenden",
+       "hideOthers": "Andere ausblenden"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "Konfigurationsschema-Verletzung",
+     "copyError": "Kopierfehler",
+     "initializationFailed": "Initialisierung fehlgeschlagen {hint}",
+-    "otherInstanceDetected": "Eine andere Instanz von MarkText läuft bereits",
++    "otherInstanceDetected": "Eine andere Instanz von mEdit läuft bereits",
+     "report": "Melden",
+     "startupError": "Startfehler",
+     "terminatedDueToError": "Aufgrund eines Fehlers beendet",
+diff --git a/packages/desktop/static/locales/en.json b/packages/desktop/static/locales/en.json
+index e56f616..8f1cd27 100644
+--- a/packages/desktop/static/locales/en.json
++++ b/packages/desktop/static/locales/en.json
+@@ -92,21 +92,21 @@
+       "reportBug": "Report Bug",
+       "viewSource": "View Source",
+       "followUs": "Follow Us",
+-      "support": "Support MarkText",
++      "support": "Support mEdit",
+       "license": "License",
+       "about": "About",
+       "checkUpdates": "Check for Updates"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "About MarkText",
++      "title": "mEdit",
++      "about": "About mEdit",
+       "checkUpdates": "Check for Updates...",
+       "preferences": "Preferences",
+       "services": "Services",
+-      "hide": "Hide MarkText",
++      "hide": "Hide mEdit",
+       "hideOthers": "Hide Others",
+       "showAll": "Show All",
+-      "quit": "Quit MarkText"
++      "quit": "Quit mEdit"
+     },
+     "view": {
+       "view": "View",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "Import or Open",
+-    "description": "Drop here to get your stuff into MarkText"
++    "description": "Drop here to get your stuff into mEdit"
+   },
+   "preferences": {
+     "title": "Preferences",
+@@ -371,10 +371,10 @@
+         "hideScrollbar": "Whether to hide scrollbars",
+         "wordWrapInToc": "Whether to enable word wrap in TOC",
+         "fileSortBy": "Sort files in opened folder by created time, modified time and title",
+-        "startUpAction": "The action after MarkText startup, open the last edited content, open the specified folder or blank page",
++        "startUpAction": "The action after mEdit startup, open the last edited content, open the specified folder or blank page",
+         "restoreLayoutState": "Restore previous editor state on startup",
+         "defaultDirectoryToOpen": "The default directory that should be opened on startup when startUp=folder",
+-        "language": "The language MarkText uses",
++        "language": "The language mEdit uses",
+         "editorFontFamily": "Editor font family",
+         "fontSize": "Font size in pixels",
+         "lineHeight": "Line Height",
+@@ -398,7 +398,7 @@
+         "preferLooseListItem": "The preferred list type",
+         "bulletListMarker": "The marker used in bullet list",
+         "orderListDelimiter": "The delimiter used in order list",
+-        "preferHeadingStyle": "The preferred heading style in MarkText",
++        "preferHeadingStyle": "The preferred heading style in mEdit",
+         "tabSize": "Replace the tab with x spaces",
+         "listIndentation": "Select the indent of list",
+         "frontmatterType": "The frontmatter type",
+@@ -408,7 +408,7 @@
+         "isGitlabCompatibilityEnabled": "Enable GitLab compatibility mode",
+         "sequenceTheme": "Sequence diagram theme",
+         "plantumlServer": "PlantUML server URL",
+-        "theme": "Select the theme used in MarkText",
++        "theme": "Select the theme used in mEdit",
+         "followSystemTheme": "Follow System Theme",
+         "lightModeTheme": "Theme to use when system is in light mode",
+         "darkModeTheme": "Theme to use when system is in dark mode",
+@@ -616,7 +616,7 @@
+         "pleaseInstall": "Please install",
+         "scriptPath": "Script path"
+       },
+-      "defaultBehavior": "The default behavior after pasting or dragging the image to MarkText"
++      "defaultBehavior": "The default behavior after pasting or dragging the image to mEdit"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "Hide MarkText",
++      "hide": "Hide mEdit",
+       "hideOthers": "Hide Others"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "Configuration schema violation",
+     "copyError": "Copy error",
+     "initializationFailed": "Initialization failed {hint}",
+-    "otherInstanceDetected": "Another instance of MarkText is already running",
++    "otherInstanceDetected": "Another instance of mEdit is already running",
+     "report": "Report",
+     "startupError": "Startup error",
+     "terminatedDueToError": "Terminated due to error",
+diff --git a/packages/desktop/static/locales/es.json b/packages/desktop/static/locales/es.json
+index 9db5994..3bc6033 100644
+--- a/packages/desktop/static/locales/es.json
++++ b/packages/desktop/static/locales/es.json
+@@ -92,21 +92,21 @@
+       "reportBug": "Reportar Error",
+       "viewSource": "Ver Código Fuente",
+       "followUs": "Síguenos",
+-      "support": "Apoyar MarkText",
++      "support": "Apoyar mEdit",
+       "license": "Licencia",
+       "about": "Acerca de",
+       "checkUpdates": "Buscar Actualizaciones"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "Acerca de MarkText",
++      "title": "mEdit",
++      "about": "Acerca de mEdit",
+       "checkUpdates": "Buscar Actualizaciones...",
+       "preferences": "Preferencias",
+       "services": "Servicios",
+-      "hide": "Ocultar MarkText",
++      "hide": "Ocultar mEdit",
+       "hideOthers": "Ocultar Otros",
+       "showAll": "Mostrar",
+-      "quit": "Salir de MarkText"
++      "quit": "Salir de mEdit"
+     },
+     "view": {
+       "view": "Ver",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "Importar o Abrir",
+-    "description": "Arrastra aquí para obtener tu contenido en MarkText"
++    "description": "Arrastra aquí para obtener tu contenido en mEdit"
+   },
+   "preferences": {
+     "title": "Preferencias",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "Si ocultar las barras de desplazamiento",
+         "wordWrapInToc": "Si habilitar el ajuste de línea en la tabla de contenidos",
+         "fileSortBy": "Ordenar archivos en la carpeta abierta por tiempo de creación, tiempo de modificación y título",
+-        "startUpAction": "La acción después del inicio de MarkText, abrir el último contenido editado, abrir la carpeta especificada o página en blanco",
++        "startUpAction": "La acción después del inicio de mEdit, abrir el último contenido editado, abrir la carpeta especificada o página en blanco",
+         "restoreLayoutState": "Restaurar el estado anterior del editor al iniciar",
+         "defaultDirectoryToOpen": "El directorio predeterminado que debe abrirse al inicio cuando startUp=folder",
+-        "language": "El idioma que usa MarkText",
++        "language": "El idioma que usa mEdit",
+         "editorFontFamily": "Familia de fuente del editor",
+         "fontSize": "Tamaño de fuente en píxeles",
+         "lineHeight": "Altura de línea",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "El tipo de lista preferido",
+         "bulletListMarker": "El marcador usado en lista de viñetas",
+         "orderListDelimiter": "El delimitador usado en lista ordenada",
+-        "preferHeadingStyle": "El estilo de encabezado preferido en MarkText",
++        "preferHeadingStyle": "El estilo de encabezado preferido en mEdit",
+         "tabSize": "Reemplazar la tabulación con x espacios",
+         "listIndentation": "Seleccionar la sangría de lista",
+         "frontmatterType": "El tipo de frontmatter",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "Habilitar modo de compatibilidad GitLab",
+         "sequenceTheme": "Tema del diagrama de secuencia",
+         "plantumlServer": "URL del servidor PlantUML",
+-        "theme": "Seleccionar el tema usado en MarkText",
++        "theme": "Seleccionar el tema usado en mEdit",
+         "followSystemTheme": "Seguir tema del sistema",
+         "lightModeTheme": "Tema a usar cuando el sistema está en modo claro",
+         "darkModeTheme": "Tema a usar cuando el sistema está en modo oscuro",
+@@ -616,7 +616,7 @@
+         "neverDetected": "Nunca detectado",
+         "neverSuccessful": "Nunca exitoso"
+       },
+-      "defaultBehavior": "El comportamiento predeterminado después de pegar o arrastrar la imagen a MarkText"
++      "defaultBehavior": "El comportamiento predeterminado después de pegar o arrastrar la imagen a mEdit"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "Ocultar MarkText",
++      "hide": "Ocultar mEdit",
+       "hideOthers": "Ocultar Otros"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "Violación del esquema de configuración",
+     "copyError": "Error de copia",
+     "initializationFailed": "Falló la inicialización {hint}",
+-    "otherInstanceDetected": "Otra instancia de MarkText ya está ejecutándose",
++    "otherInstanceDetected": "Otra instancia de mEdit ya está ejecutándose",
+     "report": "Reportar",
+     "startupError": "Error de inicio",
+     "terminatedDueToError": "Terminado debido a error",
+diff --git a/packages/desktop/static/locales/fr.json b/packages/desktop/static/locales/fr.json
+index 216696e..9e3562c 100644
+--- a/packages/desktop/static/locales/fr.json
++++ b/packages/desktop/static/locales/fr.json
+@@ -92,21 +92,21 @@
+       "reportBug": "Signaler un bug",
+       "viewSource": "Voir le code source",
+       "followUs": "Suivez-nous",
+-      "support": "Soutenir MarkText",
++      "support": "Soutenir mEdit",
+       "license": "Licence",
+       "about": "À propos",
+       "checkUpdates": "Vérifier les mises à jour"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "À propos de MarkText",
++      "title": "mEdit",
++      "about": "À propos de mEdit",
+       "checkUpdates": "Vérifier les mises à jour...",
+       "preferences": "Préférences",
+       "services": "Services",
+-      "hide": "Masquer MarkText",
++      "hide": "Masquer mEdit",
+       "hideOthers": "Masquer les autres",
+       "showAll": "Tout afficher",
+-      "quit": "Quitter MarkText"
++      "quit": "Quitter mEdit"
+     },
+     "view": {
+       "view": "Affichage",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "Importer ou ouvrir",
+-    "description": "Glissez-déposez ici pour importer votre contenu dans MarkText"
++    "description": "Glissez-déposez ici pour importer votre contenu dans mEdit"
+   },
+   "preferences": {
+     "title": "Préférences",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "Masquer les barres de défilement",
+         "wordWrapInToc": "Activer le retour à la ligne dans la table des matières",
+         "fileSortBy": "Trier les fichiers dans le dossier ouvert par heure de création, heure de modification et titre",
+-        "startUpAction": "L'action après le démarrage de MarkText, ouvrir le dernier contenu édité, ouvrir le dossier spécifié ou une page vierge",
++        "startUpAction": "L'action après le démarrage de mEdit, ouvrir le dernier contenu édité, ouvrir le dossier spécifié ou une page vierge",
+         "restoreLayoutState": "Restaurer l'état précédent de l'éditeur au démarrage",
+         "defaultDirectoryToOpen": "Le répertoire par défaut qui devrait être ouvert au démarrage quand startUp=folder",
+-        "language": "La langue utilisée par MarkText",
++        "language": "La langue utilisée par mEdit",
+         "editorFontFamily": "Famille de police de l'éditeur",
+         "fontSize": "Taille de police en pixels",
+         "lineHeight": "Hauteur de ligne",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "Le type de liste préféré",
+         "bulletListMarker": "Le marqueur utilisé dans la liste à puces",
+         "orderListDelimiter": "Le délimiteur utilisé dans la liste ordonnée",
+-        "preferHeadingStyle": "Le style de titre préféré dans MarkText",
++        "preferHeadingStyle": "Le style de titre préféré dans mEdit",
+         "tabSize": "Remplacer la tabulation par x espaces",
+         "listIndentation": "Sélectionner l'indentation de liste",
+         "frontmatterType": "Le type de frontmatter",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "Activer le mode de compatibilité GitLab",
+         "sequenceTheme": "Thème du diagramme de séquence",
+         "plantumlServer": "URL du serveur PlantUML",
+-        "theme": "Sélectionner le thème utilisé dans MarkText",
++        "theme": "Sélectionner le thème utilisé dans mEdit",
+         "followSystemTheme": "Suivre le thème du système",
+         "lightModeTheme": "Thème à utiliser lorsque le système est en mode clair",
+         "darkModeTheme": "Thème à utiliser lorsque le système est en mode sombre",
+@@ -616,7 +616,7 @@
+         "neverDetected": "Jamais détecté",
+         "neverSuccessful": "Jamais réussi"
+       },
+-      "defaultBehavior": "Comportement par défaut après avoir collé ou glissé une image dans MarkText"
++      "defaultBehavior": "Comportement par défaut après avoir collé ou glissé une image dans mEdit"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "Masquer MarkText",
++      "hide": "Masquer mEdit",
+       "hideOthers": "Masquer les autres"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "Violation du schéma de configuration",
+     "copyError": "Erreur de copie",
+     "initializationFailed": "Échec de l'initialisation",
+-    "otherInstanceDetected": "Une autre instance de MarkText détectée en cours d'exécution",
++    "otherInstanceDetected": "Une autre instance de mEdit détectée en cours d'exécution",
+     "report": "Signaler",
+     "startupError": "Erreur de démarrage",
+     "terminatedDueToError": "Terminé en raison d'une erreur",
+diff --git a/packages/desktop/static/locales/ja.json b/packages/desktop/static/locales/ja.json
+index f48c1ad..38c45e8 100644
+--- a/packages/desktop/static/locales/ja.json
++++ b/packages/desktop/static/locales/ja.json
+@@ -92,21 +92,21 @@
+       "reportBug": "バグを報告",
+       "viewSource": "ソースコードを表示",
+       "followUs": "フォローする",
+-      "support": "MarkTextを支援",
++      "support": "mEditを支援",
+       "license": "ライセンス",
+       "about": "について",
+       "checkUpdates": "アップデートを確認"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "MarkTextについて",
++      "title": "mEdit",
++      "about": "mEditについて",
+       "checkUpdates": "アップデートを確認...",
+       "preferences": "環境設定",
+       "services": "サービス",
+-      "hide": "MarkTextを隠す",
++      "hide": "mEditを隠す",
+       "hideOthers": "他を隠す",
+       "showAll": "すべて表示",
+-      "quit": "MarkTextを終了"
++      "quit": "mEditを終了"
+     },
+     "view": {
+       "view": "表示",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "インポートまたは開く",
+-    "description": "ここにドラッグしてMarkTextにコンテンツをインポート"
++    "description": "ここにドラッグしてmEditにコンテンツをインポート"
+   },
+   "preferences": {
+     "title": "環境設定",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "スクロールバーを非表示にするかどうか",
+         "wordWrapInToc": "目次で自動改行を有効にするかどうか",
+         "fileSortBy": "開いたフォルダ内のファイルを作成時刻、変更時刻、タイトルで並べ替え",
+-        "startUpAction": "MarkText起動後のアクション、最後に編集したコンテンツを開く、指定されたフォルダを開く、または空白ページ",
++        "startUpAction": "mEdit起動後のアクション、最後に編集したコンテンツを開く、指定されたフォルダを開く、または空白ページ",
+         "restoreLayoutState": "起動時に前回のエディター状態を復元",
+         "defaultDirectoryToOpen": "startUp=folderの場合に起動時に開かれるデフォルトディレクトリ",
+-        "language": "MarkTextが使用する言語",
++        "language": "mEditが使用する言語",
+         "editorFontFamily": "エディターのフォントファミリー",
+         "fontSize": "フォントサイズ（ピクセル）",
+         "lineHeight": "行の高さ",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "優先されるリストタイプ",
+         "bulletListMarker": "箇条書きリストで使用されるマーカー",
+         "orderListDelimiter": "順序付きリストで使用される区切り文字",
+-        "preferHeadingStyle": "MarkTextで優先される見出しスタイル",
++        "preferHeadingStyle": "mEditで優先される見出しスタイル",
+         "tabSize": "タブをx個のスペースに置き換える",
+         "listIndentation": "リストのインデントを選択",
+         "frontmatterType": "フロントマターのタイプ",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "GitLab互換モードを有効にする",
+         "sequenceTheme": "シーケンス図のテーマ",
+         "plantumlServer": "PlantUMLサーバーのURL",
+-        "theme": "MarkTextで使用するテーマを選択",
++        "theme": "mEditで使用するテーマを選択",
+         "followSystemTheme": "システムのテーマに従う",
+         "lightModeTheme": "システムがライトモードの時に使用するテーマ",
+         "darkModeTheme": "システムがダークモードの時に使用するテーマ",
+@@ -616,7 +616,7 @@
+         "neverDetected": "検出されたことがない",
+         "neverSuccessful": "成功したことがない"
+       },
+-      "defaultBehavior": "MarkTextに画像を貼り付けまたはドラッグした後のデフォルト動作"
++      "defaultBehavior": "mEditに画像を貼り付けまたはドラッグした後のデフォルト動作"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "MarkTextを隠す",
++      "hide": "mEditを隠す",
+       "hideOthers": "他を隠す"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "設定スキーマ違反",
+     "copyError": "コピーエラー",
+     "initializationFailed": "初期化に失敗",
+-    "otherInstanceDetected": "MarkTextの別のインスタンスが既に実行中です",
++    "otherInstanceDetected": "mEditの別のインスタンスが既に実行中です",
+     "report": "報告",
+     "startupError": "起動エラー",
+     "terminatedDueToError": "エラーにより終了",
+diff --git a/packages/desktop/static/locales/ko.json b/packages/desktop/static/locales/ko.json
+index 84a9ea2..98d8338 100644
+--- a/packages/desktop/static/locales/ko.json
++++ b/packages/desktop/static/locales/ko.json
+@@ -92,21 +92,21 @@
+       "reportBug": "버그 신고",
+       "viewSource": "소스 보기",
+       "followUs": "팔로우하기",
+-      "support": "MarkText 후원",
++      "support": "mEdit 후원",
+       "license": "라이선스",
+       "about": "정보",
+       "checkUpdates": "업데이트 확인"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "MarkText 정보",
++      "title": "mEdit",
++      "about": "mEdit 정보",
+       "checkUpdates": "업데이트 확인...",
+       "preferences": "환경설정",
+       "services": "서비스",
+-      "hide": "MarkText 숨기기",
++      "hide": "mEdit 숨기기",
+       "hideOthers": "다른 앱 숨기기",
+       "showAll": "모두 보기",
+-      "quit": "MarkText 종료"
++      "quit": "mEdit 종료"
+     },
+     "view": {
+       "view": "보기",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "가져오기 또는 열기",
+-    "description": "여기에 드롭하여 MarkText로 가져오세요"
++    "description": "여기에 드롭하여 mEdit로 가져오세요"
+   },
+   "preferences": {
+     "title": "환경설정",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "스크롤바를 숨길지 여부",
+         "wordWrapInToc": "목차에서 자동 줄바꿈을 활성화할지 여부",
+         "fileSortBy": "열린 폴더의 파일을 생성 시간, 수정 시간, 제목으로 정렬",
+-        "startUpAction": "MarkText 시작 후 작업, 마지막으로 편집한 내용 열기, 지정된 폴더 열기 또는 빈 페이지",
++        "startUpAction": "mEdit 시작 후 작업, 마지막으로 편집한 내용 열기, 지정된 폴더 열기 또는 빈 페이지",
+         "restoreLayoutState": "시작 시 이전 편집기 상태 복원",
+         "defaultDirectoryToOpen": "startUp=folder일 때 시작 시 열어야 할 기본 디렉터리",
+-        "language": "MarkText가 사용하는 언어",
++        "language": "mEdit가 사용하는 언어",
+         "editorFontFamily": "편집기 글꼴 패밀리",
+         "fontSize": "픽셀 단위 글꼴 크기",
+         "lineHeight": "줄 높이",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "선호하는 목록 유형",
+         "bulletListMarker": "글머리 기호 목록에서 사용되는 마커",
+         "orderListDelimiter": "순서가 있는 목록에서 사용되는 구분자",
+-        "preferHeadingStyle": "MarkText에서 선호하는 제목 스타일",
++        "preferHeadingStyle": "mEdit에서 선호하는 제목 스타일",
+         "tabSize": "탭을 x개의 공백으로 바꾸기",
+         "listIndentation": "목록의 들여쓰기 선택",
+         "frontmatterType": "프론트매터 유형",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "GitLab 호환 모드 활성화",
+         "sequenceTheme": "시퀀스 다이어그램 테마",
+         "plantumlServer": "PlantUML 서버 URL",
+-        "theme": "MarkText에서 사용할 테마 선택",
++        "theme": "mEdit에서 사용할 테마 선택",
+         "followSystemTheme": "시스템 테마 따르기",
+         "lightModeTheme": "시스템이 라이트 모드일 때 사용할 테마",
+         "darkModeTheme": "시스템이 다크 모드일 때 사용할 테마",
+@@ -616,7 +616,7 @@
+         "neverDetected": "감지된 적 없음",
+         "neverSuccessful": "성공한 적 없음"
+       },
+-      "defaultBehavior": "이미지를 MarkText에 붙여넣거나 드래그한 후의 기본 동작"
++      "defaultBehavior": "이미지를 mEdit에 붙여넣거나 드래그한 후의 기본 동작"
+     },
+     "markdown": {
+       "title": "마크다운",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "MarkText 숨기기",
++      "hide": "mEdit 숨기기",
+       "hideOthers": "다른 앱 숨기기"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "구성 스키마 위반",
+     "copyError": "복사 오류",
+     "initializationFailed": "초기화 실패",
+-    "otherInstanceDetected": "MarkText의 다른 인스턴스가 이미 실행 중입니다",
++    "otherInstanceDetected": "mEdit의 다른 인스턴스가 이미 실행 중입니다",
+     "report": "신고",
+     "startupError": "시작 오류",
+     "terminatedDueToError": "오류로 인해 종료됨",
+diff --git a/packages/desktop/static/locales/pt.json b/packages/desktop/static/locales/pt.json
+index c8f4ace..f4adb87 100644
+--- a/packages/desktop/static/locales/pt.json
++++ b/packages/desktop/static/locales/pt.json
+@@ -92,21 +92,21 @@
+       "reportBug": "Reportar Bug",
+       "viewSource": "Ver Código Fonte",
+       "followUs": "Siga-nos",
+-      "support": "Apoiar MarkText",
++      "support": "Apoiar mEdit",
+       "license": "Licença",
+       "about": "Sobre",
+       "checkUpdates": "Verificar Atualizações"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "Sobre MarkText",
++      "title": "mEdit",
++      "about": "Sobre mEdit",
+       "checkUpdates": "Verificar Atualizações...",
+       "preferences": "Preferências",
+       "services": "Serviços",
+-      "hide": "Ocultar MarkText",
++      "hide": "Ocultar mEdit",
+       "hideOthers": "Ocultar Outros",
+       "showAll": "Mostrar Todos",
+-      "quit": "Sair do MarkText"
++      "quit": "Sair do mEdit"
+     },
+     "view": {
+       "view": "Visualizar",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "Importar ou Abrir",
+-    "description": "Solte aqui para colocar suas coisas no MarkText"
++    "description": "Solte aqui para colocar suas coisas no mEdit"
+   },
+   "preferences": {
+     "title": "Preferências",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "Se ocultar as barras de rolagem",
+         "wordWrapInToc": "Se habilitar a quebra de linha na tabela de conteúdos",
+         "fileSortBy": "Ordenar arquivos na pasta aberta por tempo de criação, tempo de modificação e título",
+-        "startUpAction": "A ação após a inicialização do MarkText, abrir o último conteúdo editado, abrir a pasta especificada ou página em branco",
++        "startUpAction": "A ação após a inicialização do mEdit, abrir o último conteúdo editado, abrir a pasta especificada ou página em branco",
+         "restoreLayoutState": "Restaurar o estado anterior do editor na inicialização",
+         "defaultDirectoryToOpen": "O diretório padrão que deve ser aberto na inicialização quando startUp=folder",
+-        "language": "O idioma que o MarkText usa",
++        "language": "O idioma que o mEdit usa",
+         "editorFontFamily": "Família de fonte do editor",
+         "fontSize": "Tamanho da fonte em pixels",
+         "lineHeight": "Altura da linha",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "O tipo de lista preferido",
+         "bulletListMarker": "O marcador usado na lista de marcadores",
+         "orderListDelimiter": "O delimitador usado na lista ordenada",
+-        "preferHeadingStyle": "O estilo de cabeçalho preferido no MarkText",
++        "preferHeadingStyle": "O estilo de cabeçalho preferido no mEdit",
+         "tabSize": "Substituir a tabulação com x espaços",
+         "listIndentation": "Selecionar a indentação da lista",
+         "frontmatterType": "O tipo de frontmatter",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "Habilitar modo de compatibilidade GitLab",
+         "sequenceTheme": "Tema do diagrama de sequência",
+         "plantumlServer": "URL do servidor PlantUML",
+-        "theme": "Selecionar o tema usado no MarkText",
++        "theme": "Selecionar o tema usado no mEdit",
+         "followSystemTheme": "Seguir tema do sistema",
+         "lightModeTheme": "Tema a ser usado quando o sistema está no modo claro",
+         "darkModeTheme": "Tema a ser usado quando o sistema está no modo escuro",
+@@ -616,7 +616,7 @@
+         "neverDetected": "Nunca detectado",
+         "neverSuccessful": "Nunca bem-sucedido"
+       },
+-      "defaultBehavior": "O comportamento padrão após colar ou arrastar a imagem para o MarkText"
++      "defaultBehavior": "O comportamento padrão após colar ou arrastar a imagem para o mEdit"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "Ocultar MarkText",
++      "hide": "Ocultar mEdit",
+       "hideOthers": "Ocultar Outros"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "Violação do esquema de configuração",
+     "copyError": "Erro de cópia",
+     "initializationFailed": "Falha na inicialização",
+-    "otherInstanceDetected": "Outra instância do MarkText já está em execução",
++    "otherInstanceDetected": "Outra instância do mEdit já está em execução",
+     "report": "Reportar",
+     "startupError": "Erro de inicialização",
+     "terminatedDueToError": "Terminado devido a erro",
+diff --git a/packages/desktop/static/locales/tr.json b/packages/desktop/static/locales/tr.json
+index 27f46a2..2720545 100644
+--- a/packages/desktop/static/locales/tr.json
++++ b/packages/desktop/static/locales/tr.json
+@@ -92,21 +92,21 @@
+       "reportBug": "Hata Bildir",
+       "viewSource": "Kaynağı Görüntüle",
+       "followUs": "Bizi Takip Edin",
+-      "support": "MarkText'e Destek Ol",
++      "support": "mEdit'e Destek Ol",
+       "license": "Lisans",
+       "about": "Hakkında",
+       "checkUpdates": "Güncellemeleri Denetle"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "MarkText Hakkında",
++      "title": "mEdit",
++      "about": "mEdit Hakkında",
+       "checkUpdates": "Güncellemeleri Denetle...",
+       "preferences": "Tercihler",
+       "services": "Hizmetler",
+-      "hide": "MarkText'i Gizle",
++      "hide": "mEdit'i Gizle",
+       "hideOthers": "Diğerlerini Gizle",
+       "showAll": "Tümünü Göster",
+-      "quit": "MarkText'ten Çık"
++      "quit": "mEdit'ten Çık"
+     },
+     "view": {
+       "view": "Görünüm",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "İçe Aktar veya Aç",
+-    "description": "İçeriklerinizi MarkText'e almak için buraya bırakın"
++    "description": "İçeriklerinizi mEdit'e almak için buraya bırakın"
+   },
+   "preferences": {
+     "title": "Tercihler",
+@@ -371,10 +371,10 @@
+         "hideScrollbar": "Kaydırma çubuklarının gizlenip gizlenmeyeceği",
+         "wordWrapInToc": "İçindekilerde sözcük kaydırmanın etkinleştirilip etkinleştirilmeyeceği",
+         "fileSortBy": "Açık klasördeki dosyaları oluşturulma zamanı, değiştirilme zamanı ve başlığa göre sırala",
+-        "startUpAction": "MarkText başladıktan sonraki eylem: son düzenlenen içeriği aç, belirtilen klasörü aç veya boş sayfa",
++        "startUpAction": "mEdit başladıktan sonraki eylem: son düzenlenen içeriği aç, belirtilen klasörü aç veya boş sayfa",
+         "restoreLayoutState": "Başlangıçta önceki düzenleyici durumunu geri yükle",
+         "defaultDirectoryToOpen": "startUp=folder olduğunda başlangıçta açılması gereken varsayılan klasör",
+-        "language": "MarkText'in kullandığı dil",
++        "language": "mEdit'in kullandığı dil",
+         "editorFontFamily": "Düzenleyici yazı tipi ailesi",
+         "fontSize": "Piksel cinsinden yazı tipi boyutu",
+         "lineHeight": "Satır Yüksekliği",
+@@ -398,7 +398,7 @@
+         "preferLooseListItem": "Tercih edilen liste türü",
+         "bulletListMarker": "Sırasız listede kullanılan işaret",
+         "orderListDelimiter": "Sıralı listede kullanılan ayraç",
+-        "preferHeadingStyle": "MarkText'te tercih edilen başlık stili",
++        "preferHeadingStyle": "mEdit'te tercih edilen başlık stili",
+         "tabSize": "Sekmeyi x boşlukla değiştir",
+         "listIndentation": "Liste girintisini seçin",
+         "frontmatterType": "Ön bilgi türü",
+@@ -407,7 +407,7 @@
+         "isHtmlEnabled": "HTML işlemeyi etkinleştir",
+         "isGitlabCompatibilityEnabled": "GitLab uyumluluk modunu etkinleştir",
+         "sequenceTheme": "Dizi diyagramı teması",
+-        "theme": "MarkText'te kullanılan temayı seçin",
++        "theme": "mEdit'te kullanılan temayı seçin",
+         "followSystemTheme": "Sistem Temasını Takip Et",
+         "lightModeTheme": "Sistem açık moddayken kullanılacak tema",
+         "darkModeTheme": "Sistem koyu moddayken kullanılacak tema",
+@@ -616,7 +616,7 @@
+         "pleaseInstall": "Lütfen yükleyin",
+         "scriptPath": "Betik yolu"
+       },
+-      "defaultBehavior": "Görseli MarkText'e yapıştırdıktan veya sürükledikten sonraki varsayılan davranış"
++      "defaultBehavior": "Görseli mEdit'e yapıştırdıktan veya sürükledikten sonraki varsayılan davranış"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "MarkText'i Gizle",
++      "hide": "mEdit'i Gizle",
+       "hideOthers": "Diğerlerini Gizle"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "Yapılandırma şeması ihlali",
+     "copyError": "Kopyalama hatası",
+     "initializationFailed": "Başlatma başarısız {hint}",
+-    "otherInstanceDetected": "Başka bir MarkText penceresi zaten açık",
++    "otherInstanceDetected": "Başka bir mEdit penceresi zaten açık",
+     "report": "Bildir",
+     "startupError": "Başlangıç hatası",
+     "terminatedDueToError": "Hata nedeniyle sonlandırıldı",
+diff --git a/packages/desktop/static/locales/zh-CN.json b/packages/desktop/static/locales/zh-CN.json
+index d32ecab..5462da0 100644
+--- a/packages/desktop/static/locales/zh-CN.json
++++ b/packages/desktop/static/locales/zh-CN.json
+@@ -92,21 +92,21 @@
+       "reportBug": "报告错误",
+       "viewSource": "查看源码",
+       "followUs": "关注我们",
+-      "support": "支持 MarkText",
++      "support": "支持 mEdit",
+       "license": "许可证",
+       "about": "关于",
+       "checkUpdates": "检查更新"
+     },
+     "marktext": {
+-      "title": "MarkText",
+-      "about": "关于 MarkText",
++      "title": "mEdit",
++      "about": "关于 mEdit",
+       "checkUpdates": "检查更新…",
+       "preferences": "偏好设置",
+       "services": "服务",
+-      "hide": "隐藏 MarkText",
++      "hide": "隐藏 mEdit",
+       "hideOthers": "隐藏其他",
+       "showAll": "显示全部",
+-      "quit": "退出 MarkText"
++      "quit": "退出 mEdit"
+     },
+     "view": {
+       "view": "视图",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "导入或打开",
+-    "description": "拖放到这里将您的内容导入 MarkText"
++    "description": "拖放到这里将您的内容导入 mEdit"
+   },
+   "preferences": {
+     "title": "偏好设置",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "是否隐藏滚动条",
+         "wordWrapInToc": "是否在目录中启用自动换行",
+         "fileSortBy": "按创建时间、修改时间和标题对打开文件夹中的文件进行排序",
+-        "startUpAction": "MarkText 启动后的操作，打开最后编辑的内容、打开指定文件夹或空白页",
++        "startUpAction": "mEdit 启动后的操作，打开最后编辑的内容、打开指定文件夹或空白页",
+         "restoreLayoutState": "启动时恢复上次编辑器状态",
+         "defaultDirectoryToOpen": "当 startUp=folder 时启动时应打开的默认目录",
+-        "language": "MarkText 使用的语言",
++        "language": "mEdit 使用的语言",
+         "editorFontFamily": "编辑器字体系列",
+         "fontSize": "字体大小（像素）",
+         "lineHeight": "行高",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "首选列表类型",
+         "bulletListMarker": "项目符号列表中使用的标记",
+         "orderListDelimiter": "有序列表中使用的分隔符",
+-        "preferHeadingStyle": "MarkText 中的首选标题样式",
++        "preferHeadingStyle": "mEdit 中的首选标题样式",
+         "tabSize": "用 x 个空格替换制表符",
+         "listIndentation": "选择列表的缩进",
+         "frontmatterType": "前言类型",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "启用 GitLab 兼容模式",
+         "sequenceTheme": "序列图主题",
+         "plantumlServer": "PlantUML 服务器 URL",
+-        "theme": "选择 MarkText 中使用的主题",
++        "theme": "选择 mEdit 中使用的主题",
+         "followSystemTheme": "跟随系统主题",
+         "lightModeTheme": "系统处于浅色模式时使用的主题",
+         "darkModeTheme": "系统处于深色模式时使用的主题",
+@@ -616,7 +616,7 @@
+         "pleaseInstall": "请安装",
+         "scriptPath": "脚本路径"
+       },
+-      "defaultBehavior": "粘贴或拖拽图片到 MarkText 后的默认行为"
++      "defaultBehavior": "粘贴或拖拽图片到 mEdit 后的默认行为"
+     },
+     "markdown": {
+       "title": "Markdown",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "隐藏 MarkText",
++      "hide": "隐藏 mEdit",
+       "hideOthers": "隐藏其他"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "配置架构违规",
+     "copyError": "复制错误",
+     "initializationFailed": "初始化失败",
+-    "otherInstanceDetected": "检测到 MarkText 的另一个实例正在运行",
++    "otherInstanceDetected": "检测到 mEdit 的另一个实例正在运行",
+     "report": "报告",
+     "startupError": "启动错误",
+     "terminatedDueToError": "由于错误而终止",
+diff --git a/packages/desktop/static/locales/zh-TW.json b/packages/desktop/static/locales/zh-TW.json
+index 17621c1..ad539ac 100644
+--- a/packages/desktop/static/locales/zh-TW.json
++++ b/packages/desktop/static/locales/zh-TW.json
+@@ -92,21 +92,21 @@
+       "reportBug": "回報錯誤",
+       "viewSource": "檢視原始碼",
+       "followUs": "關注我們",
+-      "support": "支持 MarkText",
++      "support": "支持 mEdit",
+       "license": "授權條款",
+       "about": "關於",
+       "checkUpdates": "檢查更新"
+     },
+     "marktext": {
+       "title": "關於",
+-      "about": "關於 MarkText",
++      "about": "關於 mEdit",
+       "checkUpdates": "檢查更新…",
+       "preferences": "偏好設定",
+       "services": "服務",
+-      "hide": "隱藏 MarkText",
++      "hide": "隱藏 mEdit",
+       "hideOthers": "隱藏其他",
+       "showAll": "顯示全部",
+-      "quit": "退出 MarkText"
++      "quit": "退出 mEdit"
+     },
+     "view": {
+       "view": "檢視",
+@@ -343,7 +343,7 @@
+   },
+   "import": {
+     "title": "匯入或開啟",
+-    "description": "拖放到這裡將您的內容匯入 MarkText"
++    "description": "拖放到這裡將您的內容匯入 mEdit"
+   },
+   "preferences": {
+     "title": "偏好設定",
+@@ -372,10 +372,10 @@
+         "hideScrollbar": "是否隱藏捲軸",
+         "wordWrapInToc": "是否在目錄中啟用自動換行",
+         "fileSortBy": "按建立時間、修改時間和標題對開啟資料夾中的檔案進行排序",
+-        "startUpAction": "MarkText 啟動後的操作，開啟最後編輯的內容、開啟指定資料夾或空白頁面",
++        "startUpAction": "mEdit 啟動後的操作，開啟最後編輯的內容、開啟指定資料夾或空白頁面",
+         "restoreLayoutState": "啟動時還原上次編輯器狀態",
+         "defaultDirectoryToOpen": "當 startUp=folder 時啟動時應開啟的預設目錄",
+-        "language": "MarkText 使用的語言",
++        "language": "mEdit 使用的語言",
+         "editorFontFamily": "編輯器字型系列",
+         "fontSize": "字型大小（像素）",
+         "lineHeight": "行高",
+@@ -399,7 +399,7 @@
+         "preferLooseListItem": "首選清單類型",
+         "bulletListMarker": "項目符號清單中使用的標記",
+         "orderListDelimiter": "有序清單中使用的分隔符",
+-        "preferHeadingStyle": "MarkText 中的首選標題樣式",
++        "preferHeadingStyle": "mEdit 中的首選標題樣式",
+         "tabSize": "用 x 個空格替換製表符",
+         "listIndentation": "選擇清單的縮排",
+         "frontmatterType": "前言類型",
+@@ -409,7 +409,7 @@
+         "isGitlabCompatibilityEnabled": "啟用 GitLab 相容模式",
+         "sequenceTheme": "序列圖主題",
+         "plantumlServer": "PlantUML 伺服器 URL",
+-        "theme": "選擇 MarkText 中使用的主題",
++        "theme": "選擇 mEdit 中使用的主題",
+         "followSystemTheme": "跟隨系統主題",
+         "lightModeTheme": "系統處於淺色模式時使用的主題",
+         "darkModeTheme": "系統處於深色模式時使用的主題",
+@@ -616,7 +616,7 @@
+         "neverDetected": "從未偵測",
+         "neverSuccessful": "從未成功"
+       },
+-      "defaultBehavior": "貼上或拖曳圖片到 MarkText 後的預設行為"
++      "defaultBehavior": "貼上或拖曳圖片到 mEdit 後的預設行為"
+     },
+     "markdown": {
+       "title": "PicGo 設定",
+@@ -733,7 +733,7 @@
+   },
+   "commands": {
+     "mt": {
+-      "hide": "隱藏 MarkText",
++      "hide": "隱藏 mEdit",
+       "hideOthers": "隱藏其他"
+     },
+     "file": {
+@@ -899,7 +899,7 @@
+     "configSchemaViolation": "設定結構違規",
+     "copyError": "複製錯誤",
+     "initializationFailed": "初始化失敗",
+-    "otherInstanceDetected": "偵測到另一個 MarkText 實例正在執行",
++    "otherInstanceDetected": "偵測到另一個 mEdit 實例正在執行",
+     "report": "回報",
+     "startupError": "啟動錯誤",
+     "terminatedDueToError": "因錯誤而終止",
+diff --git a/packages/desktop/static/preference.json b/packages/desktop/static/preference.json
+index c3d757e..8280b4e 100644
+--- a/packages/desktop/static/preference.json
++++ b/packages/desktop/static/preference.json
+@@ -1,7 +1,7 @@
+ {
+   "autoSave": false,
+   "autoSaveDelay": 5000,
+-  "titleBarStyle": "custom",
++  "titleBarStyle": "native",
+   "openFilesInNewWindow": false,
+   "openFolderInNewWindow": false,
+   "zoom": 1.0,
+diff --git a/packages/desktop/test/unit/specs/classic-menu-default.spec.ts b/packages/desktop/test/unit/specs/classic-menu-default.spec.ts
+new file mode 100644
+index 0000000..d89e08e
+--- /dev/null
++++ b/packages/desktop/test/unit/specs/classic-menu-default.spec.ts
+@@ -0,0 +1,10 @@
++import { describe, expect, it } from 'vitest'
++import preferenceDefaults from '../../../static/preference.json'
++import preferenceSchema from '../../../src/main/preferences/schema.json'
++
++describe('classic drop-down menu default', () => {
++  it('uses the native title bar for new installations', () => {
++    expect(preferenceDefaults.titleBarStyle).toBe('native')
++    expect(preferenceSchema.titleBarStyle.default).toBe('native')
++  })
++})
+diff --git a/packages/muya/src/assets/styles/blockSyntax.css b/packages/muya/src/assets/styles/blockSyntax.css
+index 2eb1eed..e77edbd 100644
+--- a/packages/muya/src/assets/styles/blockSyntax.css
++++ b/packages/muya/src/assets/styles/blockSyntax.css
+@@ -17,7 +17,7 @@
+     box-sizing: border-box;
+     max-width: var(--editor-area-width, 800px);
+     min-height: 100%;
+-    margin: 0 auto;
++    margin: 0;
+     padding: 0 50px 100px;
+ 
+     color: var(--editor-color);
+diff --git a/packages/muya/src/assets/styles/index.css b/packages/muya/src/assets/styles/index.css
+index ffc1c74..c8096db 100644
+--- a/packages/muya/src/assets/styles/index.css
++++ b/packages/muya/src/assets/styles/index.css
+@@ -11,7 +11,7 @@
+     --editor-color-04: #f7f7f7;
+     --editor-bg-color: rgb(255 255 255 / 100%);
+ 
+-    /* width of the centered editing column (`.mu-container` max-width) */
++    /* maximum width of the left-aligned editing column (`.mu-container`) */
+     --editor-area-width: 800px;
+     --delete-color: #ff6969;
+     --icon-color: #6b737b;
