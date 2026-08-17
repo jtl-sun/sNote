@@ -51,6 +51,11 @@ jobs:
           git apply classic-menu.patch
           git diff --check
 
+      - name: Install dependencies
+        working-directory: marktext
+        shell: pwsh
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Isolate the test build from regular MarkText
         shell: pwsh
         run: |
@@ -64,14 +69,9 @@ jobs:
           Set-Content $builderPath $builder -NoNewline
 
           $packagePath = 'marktext/packages/desktop/package.json'
-          $package = Get-Content $packagePath -Raw
-          $package = $package.Replace('"name": "marktext",', '"name": "marktext",`n  "productName": "MarkText Classic Menu",')
-          Set-Content $packagePath $package -NoNewline
-
-      - name: Install dependencies
-        working-directory: marktext
-        shell: pwsh
-        run: pnpm install --frozen-lockfile --ignore-scripts
+          $package = Get-Content $packagePath -Raw | ConvertFrom-Json
+          $package | Add-Member -NotePropertyName productName -NotePropertyValue 'MarkText Classic Menu' -Force
+          $package | ConvertTo-Json -Depth 100 | Set-Content $packagePath
 
       - name: Prepare Electron native dependencies
         working-directory: marktext
