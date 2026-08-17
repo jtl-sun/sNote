@@ -111,7 +111,7 @@ jobs:
       - name: Verify packaged renderer
         shell: pwsh
         run: |
-          $compiledCss = Get-Content 'marktext/packages/desktop/out/renderer/assets/*.css' -Raw
+          $compiledCss = (Get-Content 'marktext/packages/desktop/out/renderer/assets/*.css' -Raw) -join [Environment]::NewLine
           if ($compiledCss -notmatch '(?s)\.mu-container\s*\{.*?margin:\s*0;') {
             throw 'The packaged editor is not left aligned.'
           }
