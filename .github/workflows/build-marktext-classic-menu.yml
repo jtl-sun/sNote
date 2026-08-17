@@ -1,4 +1,4 @@
-name: Build MarkText Classic Menu for Windows
+name: Build mEdit for Windows
 
 on:
   push:
@@ -56,22 +56,48 @@ jobs:
         shell: pwsh
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Isolate the test build from regular MarkText
+      - name: Brand the isolated test build as mEdit
         shell: pwsh
         run: |
           $builderPath = 'marktext/packages/desktop/electron-builder.yml'
           $builder = Get-Content $builderPath -Raw
-          $builder = $builder.Replace('appId: com.github.marktext.marktext', 'appId: com.jtlsun.marktext.classicmenu')
-          $builder = $builder.Replace('productName: marktext', 'productName: MarkText Classic Menu')
-          $builder = $builder.Replace('executableName: marktext', 'executableName: marktext-classic-menu')
-          $builder = $builder.Replace('marktext-win-', 'MarkText-Classic-Menu-Windows-')
+          $builder = $builder.Replace('appId: com.github.marktext.marktext', 'appId: com.jtlsun.medit')
+          $builder = $builder.Replace('productName: marktext', 'productName: mEdit')
+          $builder = $builder.Replace('executableName: marktext', 'executableName: mEdit')
+          $builder = $builder.Replace('marktext-win-', 'mEdit-Windows-')
           $builder = [regex]::Replace($builder, '(?ms)^fileAssociations:.*?^win:', 'win:')
           Set-Content $builderPath $builder -NoNewline
 
           $packagePath = 'marktext/packages/desktop/package.json'
           $package = Get-Content $packagePath -Raw | ConvertFrom-Json
-          $package | Add-Member -NotePropertyName productName -NotePropertyValue 'MarkText Classic Menu' -Force
+          $package | Add-Member -NotePropertyName productName -NotePropertyValue 'mEdit' -Force
+          $package.description = 'mEdit Markdown editor'
           $package | ConvertTo-Json -Depth 100 | Set-Content $packagePath
+
+          $replacements = @(
+            @{ Path = 'marktext/packages/desktop/src/renderer/src/components/titleBar/index.vue'; Old = '>MarkText<'; New = '>mEdit<' },
+            @{ Path = 'marktext/packages/desktop/src/renderer/src/components/about/index.vue'; Old = "const name = 'MarkText'"; New = "const name = 'mEdit'" },
+            @{ Path = 'marktext/packages/desktop/src/renderer/index.html'; Old = '<title>MarkText</title>'; New = '<title>mEdit</title>' },
+            @{ Path = 'marktext/packages/desktop/src/main/index.ts'; Old = "productName: 'marktext'"; New = "productName: 'mEdit'" },
+            @{ Path = 'marktext/packages/desktop/src/main/exceptionHandler.ts'; Old = 'MarkText:'; New = 'mEdit:' },
+            @{ Path = 'marktext/packages/desktop/src/main/exceptionHandler.ts'; Old = "companyName: 'marktext'"; New = "companyName: 'mEdit'" },
+            @{ Path = 'marktext/packages/desktop/src/main/exceptionHandler.ts'; Old = "productName: 'marktext'"; New = "productName: 'mEdit'" },
+            @{ Path = 'marktext/packages/desktop/src/main/windows/editor.ts'; Old = 'MarkText has crashed'; New = 'mEdit has crashed' },
+            @{ Path = 'marktext/packages/desktop/src/main/cli/index.ts'; Old = 'MarkText:'; New = 'mEdit:' }
+          )
+          foreach ($replacement in $replacements) {
+            $content = Get-Content $replacement.Path -Raw
+            $content = $content.Replace($replacement.Old, $replacement.New)
+            Set-Content $replacement.Path $content -NoNewline
+          }
+
+          Copy-Item 'build-assets/medit-icon.ico' 'marktext/packages/desktop/static/icon.ico' -Force
+          Copy-Item 'build-assets/medit-icon.ico' 'marktext/packages/desktop/build/icons/icon.ico' -Force
+          Copy-Item 'build-assets/medit-icon.png' 'marktext/packages/desktop/static/icon.png' -Force
+          Copy-Item 'build-assets/medit-icon.png' 'marktext/packages/desktop/build/icons/icon.png' -Force
+          magick 'build-assets/medit-icon.png' -resize 96x96 'marktext/packages/desktop/static/logo-96px.png'
+          magick 'build-assets/medit-icon.png' -resize 1025x1025 'marktext/packages/desktop/static/logo-small.png'
+          magick 'build-assets/medit-icon.png' -resize 150x150 'marktext/packages/desktop/src/renderer/src/assets/images/logo.png'
 
       - name: Prepare Electron native dependencies
         working-directory: marktext
@@ -103,7 +129,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: MarkText-Classic-Menu-Windows-x64
+          name: mEdit-Windows-x64
           retention-days: 30
           if-no-files-found: error
           path: |
