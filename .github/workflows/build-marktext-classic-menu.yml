@@ -51,6 +51,23 @@ jobs:
           git apply classic-menu.patch
           git diff --check
 
+      - name: Isolate the test build from regular MarkText
+        shell: pwsh
+        run: |
+          $builderPath = 'marktext/packages/desktop/electron-builder.yml'
+          $builder = Get-Content $builderPath -Raw
+          $builder = $builder.Replace('appId: com.github.marktext.marktext', 'appId: com.jtlsun.marktext.classicmenu')
+          $builder = $builder.Replace('productName: marktext', 'productName: MarkText Classic Menu')
+          $builder = $builder.Replace('executableName: marktext', 'executableName: marktext-classic-menu')
+          $builder = $builder.Replace('marktext-win-', 'MarkText-Classic-Menu-Windows-')
+          $builder = [regex]::Replace($builder, '(?ms)^fileAssociations:.*?^win:', 'win:')
+          Set-Content $builderPath $builder -NoNewline
+
+          $packagePath = 'marktext/packages/desktop/package.json'
+          $package = Get-Content $packagePath -Raw
+          $package = $package.Replace('"name": "marktext",', '"name": "marktext",`n  "productName": "MarkText Classic Menu",')
+          Set-Content $packagePath $package -NoNewline
+
       - name: Install dependencies
         working-directory: marktext
         shell: pwsh
