@@ -1,4 +1,4 @@
-name: Build mEdit 0.21.0 for Windows
+name: Build mEdit 0.21.1 for Windows
 
 on:
   push:
@@ -49,6 +49,14 @@ jobs:
           git apply ../build-assets/mEdit-0.21.0-source.patch
           git diff --check
 
+      - name: Apply mEdit 0.21.1 Markdown guide update
+        shell: pwsh
+        run: |
+          Set-Location marktext
+          git apply --check ../build-assets/mEdit-0.21.1-update.patch
+          git apply ../build-assets/mEdit-0.21.1-update.patch
+          git diff --check
+
       - name: Install dependencies
         working-directory: marktext
         shell: pwsh
@@ -77,8 +85,15 @@ jobs:
         shell: pwsh
         run: |
           $package = Get-Content 'marktext/packages/desktop/package.json' -Raw | ConvertFrom-Json
-          if ($package.version -ne '0.21.0') {
-            throw "Expected mEdit 0.21.0, found $($package.version)"
+          if ($package.version -ne '0.21.1') {
+            throw "Expected mEdit 0.21.1, found $($package.version)"
+          }
+
+          $guide = Get-Content 'marktext/packages/desktop/src/renderer/src/components/markdownGuide/index.vue' -Raw
+          foreach ($requiredText in @('Markdown 빠른 안내서', '제목 만들기', '체크박스 목록', '표 만들기', '수학식')) {
+            if (-not $guide.Contains($requiredText)) {
+              throw "Markdown guide is missing required section: $requiredText"
+            }
           }
 
           $editorCss = Get-Content 'marktext/packages/muya/src/assets/styles/blockSyntax.css' -Raw
@@ -101,7 +116,7 @@ jobs:
         shell: pwsh
         run: pnpm --filter marktext typecheck
 
-      - name: Build mEdit 0.21.0 installer and portable ZIP
+      - name: Build mEdit 0.21.1 installer and portable ZIP
         working-directory: marktext
         shell: pwsh
         run: pnpm build:win:x64
@@ -116,6 +131,11 @@ jobs:
             throw 'The packaged editor is not left aligned.'
           }
 
+          $compiledJs = (Get-Content 'marktext/packages/desktop/out/renderer/assets/*.js' -Raw) -join [Environment]::NewLine
+          if (-not $compiledJs.Contains('Markdown 빠른 안내서')) {
+            throw 'The packaged Markdown guide was not found.'
+          }
+
           $forbidden = Get-ChildItem 'marktext/packages/desktop/out' -Recurse -Include '*.js','*.css','*.html' |
             Select-String -Pattern 'marktext\.me|github\.com/marktext|twitter\.com/marktext|marktext\.app'
           if ($forbidden) {
@@ -123,8 +143,8 @@ jobs:
             throw 'MarkText information links remain in the packaged application.'
           }
 
-          if (-not (Test-Path 'marktext/dist/mEdit-Windows-x64-0.21.0-setup.exe')) {
-            throw 'The versioned mEdit 0.21.0 installer was not created.'
+          if (-not (Test-Path 'marktext/dist/mEdit-Windows-x64-0.21.1-setup.exe')) {
+            throw 'The versioned mEdit 0.21.1 installer was not created.'
           }
 
       - name: Generate checksums
@@ -134,10 +154,10 @@ jobs:
             ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } |
             Set-Content marktext/dist/SHA256SUMS.txt
 
-      - name: Upload mEdit 0.21.0 Windows installer
+      - name: Upload mEdit 0.21.1 Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: mEdit-0.21.0-Windows-x64
+          name: mEdit-0.21.1-Windows-x64
           retention-days: 30
           if-no-files-found: error
           path: |
