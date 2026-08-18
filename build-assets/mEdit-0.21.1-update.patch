@@ -1,0 +1,363 @@
+diff --git a/package.json b/package.json
+index 265e40b..bea0594 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "medit-monorepo",
+-  "version": "0.21.0",
++  "version": "0.21.1",
+   "description": "mEdit monorepo root",
+   "private": true,
+   "packageManager": "pnpm@10.33.4",
+diff --git a/packages/desktop/package.json b/packages/desktop/package.json
+index 18d7ae6..658c8b2 100644
+--- a/packages/desktop/package.json
++++ b/packages/desktop/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "marktext",
+   "productName": "mEdit",
+-  "version": "0.21.0",
++  "version": "0.21.1",
+   "description": "mEdit Markdown editor",
+   "main": "./out/main/index.js",
+   "author": {
+diff --git a/packages/desktop/src/main/menu/actions/help.ts b/packages/desktop/src/main/menu/actions/help.ts
+index 451e426..6991742 100644
+--- a/packages/desktop/src/main/menu/actions/help.ts
++++ b/packages/desktop/src/main/menu/actions/help.ts
+@@ -5,3 +5,9 @@ export const showAboutDialog = (win: BrowserWindow | null | undefined): void =>
+     win.webContents.send('mt::about-dialog')
+   }
+ }
++
++export const showMarkdownGuide = (win: BrowserWindow | null | undefined): void => {
++  if (win && win.webContents) {
++    win.webContents.send('mt::markdown-guide-dialog')
++  }
++}
+diff --git a/packages/desktop/src/main/menu/templates/help.ts b/packages/desktop/src/main/menu/templates/help.ts
+index 36b5c81..b296323 100644
+--- a/packages/desktop/src/main/menu/templates/help.ts
++++ b/packages/desktop/src/main/menu/templates/help.ts
+@@ -7,6 +7,15 @@ export default function(): MenuItemConstructorOptions {
+     label: t('menu.help.help'),
+     role: 'help',
+     submenu: [
++      {
++        label: 'Markdown 빠른 안내서',
++        click(_menuItem, browserWindow) {
++          actions.showMarkdownGuide(browserWindow as BrowserWindow | undefined)
++        }
++      },
++      {
++        type: 'separator'
++      },
+       {
+         label: t('menu.help.about'),
+         click(_menuItem, browserWindow) {
+diff --git a/packages/desktop/src/renderer/src/components/markdownGuide/index.vue b/packages/desktop/src/renderer/src/components/markdownGuide/index.vue
+new file mode 100644
+index 0000000..e8b7587
+--- /dev/null
++++ b/packages/desktop/src/renderer/src/components/markdownGuide/index.vue
+@@ -0,0 +1,252 @@
++<template>
++  <el-dialog
++    v-model="visible"
++    class="markdown-guide-dialog"
++    width="760px"
++    :append-to-body="true"
++    :close-on-click-modal="true"
++  >
++    <template #header>
++      <div class="guide-header">
++        <h2>Markdown 빠른 안내서</h2>
++        <p>자주 사용하는 문법부터 순서대로 정리했습니다. 회색 상자의 문법을 문서에 입력하세요.</p>
++      </div>
++    </template>
++
++    <div class="guide-body">
++      <section
++        v-for="(item, index) in guideItems"
++        :key="item.title"
++        class="guide-item"
++      >
++        <div class="guide-item-heading">
++          <span class="priority">{{ index + 1 }}</span>
++          <div>
++            <h3>{{ item.title }}</h3>
++            <p>{{ item.description }}</p>
++          </div>
++        </div>
++        <pre><code>{{ item.syntax }}</code></pre>
++        <p
++          v-if="item.note"
++          class="guide-note"
++        >
++          {{ item.note }}
++        </p>
++      </section>
++
++      <section class="guide-item guide-tips">
++        <div class="guide-item-heading">
++          <span class="priority">!</span>
++          <div>
++            <h3>처음 사용할 때 기억할 점</h3>
++            <p>문법이 원하는 대로 적용되지 않을 때 먼저 확인하세요.</p>
++          </div>
++        </div>
++        <ul>
++          <li>제목, 목록, 인용문 기호 뒤에는 공백을 한 칸 넣습니다.</li>
++          <li>문단을 나누려면 문장 사이에 빈 줄을 하나 넣습니다.</li>
++          <li>문법 기호 자체를 표시하려면 앞에 역슬래시를 붙입니다: <code>\*별표\*</code></li>
++          <li>표와 코드 블록 앞뒤에는 빈 줄을 넣으면 안정적으로 표시됩니다.</li>
++        </ul>
++      </section>
++    </div>
++
++    <template #footer>
++      <el-button
++        type="primary"
++        @click="visible = false"
++      >
++        닫기
++      </el-button>
++    </template>
++  </el-dialog>
++</template>
++
++<script setup lang="ts">
++import { onBeforeUnmount, onMounted, ref } from 'vue'
++import bus from '@/bus'
++
++interface GuideItem {
++  title: string
++  description: string
++  syntax: string
++  note?: string
++}
++
++const visible = ref(false)
++
++const guideItems: GuideItem[] = [
++  {
++    title: '제목 만들기',
++    description: '#의 개수로 제목의 크기를 정합니다.',
++    syntax: '# 가장 큰 제목\n## 두 번째 제목\n### 세 번째 제목',
++    note: '# 뒤에는 반드시 공백을 한 칸 넣으세요.'
++  },
++  {
++    title: '굵게 · 기울임 · 취소선',
++    description: '강조할 글자의 앞뒤를 기호로 감쌉니다.',
++    syntax: '**굵은 글자**\n*기울임 글자*\n~~취소선~~\n***굵은 기울임***'
++  },
++  {
++    title: '글머리표 목록',
++    description: '- 기호를 사용하고 들여쓰기로 하위 목록을 만듭니다.',
++    syntax: '- 첫 번째 항목\n- 두 번째 항목\n  - 하위 항목\n  - 하위 항목'
++  },
++  {
++    title: '번호 목록',
++    description: '숫자와 마침표를 사용합니다.',
++    syntax: '1. 첫 번째 단계\n2. 두 번째 단계\n3. 세 번째 단계'
++  },
++  {
++    title: '체크박스 목록',
++    description: '할 일과 완료한 일을 구분할 때 편리합니다.',
++    syntax: '- [ ] 해야 할 일\n- [x] 완료한 일',
++    note: '대괄호 안의 x는 완료 상태를 뜻합니다.'
++  },
++  {
++    title: '링크 넣기',
++    description: '표시할 글자와 웹 주소를 함께 입력합니다.',
++    syntax: '[OpenAI 홈페이지](https://openai.com)'
++  },
++  {
++    title: '이미지 넣기',
++    description: '링크 문법 앞에 !를 붙입니다. 인터넷 주소와 로컬 파일 경로를 모두 사용할 수 있습니다.',
++    syntax: '![이미지 설명](https://example.com/image.jpg)\n![제품 사진](images/product.jpg)'
++  },
++  {
++    title: '인용문',
++    description: '다른 사람의 말이나 참고 문장을 구분합니다.',
++    syntax: '> 인용할 문장을 입력합니다.\n> 여러 줄도 사용할 수 있습니다.'
++  },
++  {
++    title: '인라인 코드와 코드 블록',
++    description: '짧은 명령어는 백틱 1개, 여러 줄 코드는 백틱 3개로 감쌉니다.',
++    syntax: '문장 안의 `명령어`\n\n```python\nprint("Hello, mEdit!")\n```'
++  },
++  {
++    title: '구분선',
++    description: '내용의 큰 구역을 나눌 때 사용합니다.',
++    syntax: '---',
++    note: '문서 맨 위가 아니라면 구분선 앞뒤에 빈 줄을 넣으세요.'
++  },
++  {
++    title: '표 만들기',
++    description: '|와 - 기호로 열과 머리글을 만듭니다.',
++    syntax: '| 품목 | 수량 | 상태 |\n| --- | ---: | :---: |\n| Necklace | 100 | 완료 |\n| Earring | 200 | 진행 |',
++    note: ':---는 왼쪽, ---:는 오른쪽, :---:는 가운데 정렬입니다.'
++  },
++  {
++    title: '각주',
++    description: '본문을 복잡하게 만들지 않고 보충 설명을 붙입니다.',
++    syntax: '이 문장에는 설명이 필요합니다.[^1]\n\n[^1]: 여기에 보충 설명을 입력합니다.'
++  },
++  {
++    title: '수학식',
++    description: '간단한 식은 $ 1개, 별도 줄의 식은 $$로 감쌉니다.',
++    syntax: '인라인 수식: $E = mc^2$\n\n$$\nx = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}\n$$'
++  }
++]
++
++const showGuide = (): void => {
++  visible.value = true
++  bus.emit('editor-blur')
++}
++
++onMounted(() => {
++  bus.on('markdownGuideDialog', showGuide)
++})
++
++onBeforeUnmount(() => {
++  bus.off('markdownGuideDialog', showGuide)
++})
++</script>
++
++<style>
++.markdown-guide-dialog .el-dialog__body {
++  max-height: 68vh;
++  padding-top: 8px;
++  overflow-y: auto;
++}
++
++.guide-header h2,
++.guide-item h3 {
++  margin: 0;
++  color: var(--floatFontColor);
++}
++
++.guide-header p,
++.guide-item p,
++.guide-tips li {
++  color: var(--floatFontColor);
++}
++
++.guide-header p {
++  margin: 8px 0 0;
++  opacity: 0.75;
++}
++
++.guide-body {
++  display: grid;
++  gap: 14px;
++}
++
++.guide-item {
++  padding: 16px;
++  border: 1px solid var(--floatBorderColor);
++  border-radius: 8px;
++  background: var(--floatBgColor);
++}
++
++.guide-item-heading {
++  display: flex;
++  gap: 12px;
++  align-items: flex-start;
++}
++
++.guide-item-heading p {
++  margin: 5px 0 0;
++  opacity: 0.72;
++}
++
++.priority {
++  display: inline-flex;
++  flex: 0 0 28px;
++  align-items: center;
++  justify-content: center;
++  width: 28px;
++  height: 28px;
++  border-radius: 50%;
++  color: #fff;
++  background: #409eff;
++  font-weight: 700;
++}
++
++.guide-item pre {
++  margin: 12px 0 0;
++  padding: 12px 14px;
++  overflow-x: auto;
++  border-radius: 6px;
++  color: var(--editorColor);
++  background: var(--editorBgColor);
++  white-space: pre-wrap;
++  user-select: text;
++}
++
++.guide-item pre code {
++  font-family: var(--codeFontFamily, Consolas, 'Courier New', monospace);
++  line-height: 1.6;
++}
++
++.guide-note {
++  margin: 9px 0 0 !important;
++  color: #e6a23c !important;
++  font-size: 13px;
++}
++
++.guide-tips ul {
++  margin: 12px 0 0 40px;
++  padding: 0;
++  line-height: 1.8;
++}
++</style>
+diff --git a/packages/desktop/src/renderer/src/pages/app.vue b/packages/desktop/src/renderer/src/pages/app.vue
+index e7ac49a..6e65c75 100644
+--- a/packages/desktop/src/renderer/src/pages/app.vue
++++ b/packages/desktop/src/renderer/src/pages/app.vue
+@@ -29,6 +29,7 @@
+         :platform="platform"
+       />
+       <command-palette />
++      <markdown-guide-dialog />
+       <about-dialog />
+       <export-setting-dialog />
+       <rename />
+@@ -47,6 +48,7 @@ import EditorWithTabs from '@/components/editorWithTabs/index.vue'
+ import TitleBar from '@/components/titleBar/index.vue'
+ import SideBar from '@/components/sideBar/index.vue'
+ import AboutDialog from '@/components/about/index.vue'
++import MarkdownGuideDialog from '@/components/markdownGuide/index.vue'
+ import CommandPalette from '@/components/commandPalette/index.vue'
+ import ExportSettingDialog from '@/components/exportSettings/index.vue'
+ import Rename from '@/components/rename/index.vue'
+diff --git a/packages/desktop/src/renderer/src/store/listenForMain.ts b/packages/desktop/src/renderer/src/store/listenForMain.ts
+index 50f5a57..3b00cb8 100644
+--- a/packages/desktop/src/renderer/src/store/listenForMain.ts
++++ b/packages/desktop/src/renderer/src/store/listenForMain.ts
+@@ -29,6 +29,9 @@ export const useListenForMainStore = defineStore('listenForMain', () => {
+     window.electron.ipcRenderer.on('mt::about-dialog', () => {
+       bus.emit('aboutDialog')
+     })
++    window.electron.ipcRenderer.on('mt::markdown-guide-dialog', () => {
++      bus.emit('markdownGuideDialog')
++    })
+     window.electron.ipcRenderer.on('mt::show-export-dialog', (_e, type) => {
+       bus.emit('showExportDialog', type)
+     })
+diff --git a/packages/desktop/src/shared/types/ipc.ts b/packages/desktop/src/shared/types/ipc.ts
+index 43fd0d0..06f8a73 100644
+--- a/packages/desktop/src/shared/types/ipc.ts
++++ b/packages/desktop/src/shared/types/ipc.ts
+@@ -221,6 +221,7 @@ export interface IpcMainEventChannels {
+   'mt::UPDATE_ERROR': [error: unknown]
+   'mt::UPDATE_NOT_AVAILABLE': [info?: unknown]
+   'mt::about-dialog': []
++  'mt::markdown-guide-dialog': []
+   'mt::ask-for-close': []
+   'mt::bootstrap-editor': [config: BootstrapEditorConfig]
+   'mt::cm-copy-as-html': []
