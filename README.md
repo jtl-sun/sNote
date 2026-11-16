@@ -18,7 +18,7 @@ small text files.
 - Converts rich clipboard content to Markdown with `Ctrl+Shift+V`.
 - Shows a live Markdown or HTML preview.
 - Keeps configurable menus for memo files, programs, websites, and system utilities.
-- Opens an integrated terminal in the current document's folder.
+- Opens and tiles the real Windows PowerShell below sNote in the current document's folder.
 - Opens an external terminal in the same working folder.
 - Saves documents and JSON settings atomically to reduce file corruption.
 
@@ -49,8 +49,21 @@ The installer creates a desktop shortcut and the `sn` command. It can also updat
 installation by double-clicking the same file again. Updates are deployed to a new versioned
 folder and never uninstall or overwrite the release currently in use. The installer asks a running
 sNote window to close normally, allowing its unsaved-document prompt to appear, and never
-force-kills it. Python 3.10 or newer and an internet connection are required for the first
-installation.
+force-kills it. If a compatible 64-bit Python (3.10–3.13) is missing, the installer
+explains the requirement and asks permission to download the official Python 3.13.17 installer
+from python.org. Python is installed privately under `%LOCALAPPDATA%\sNote\python` without
+administrator rights or changing the system Python or PATH. If PyQt5 is missing, outdated, or
+broken, the installer installs it into the private sNote virtual environment. An internet
+connection is required to fetch missing components. The install log is saved in
+`%LOCALAPPDATA%\sNote\install.log`. Existing notes and settings are never erased.
+
+If you do **not** want to install Python or PyQt5, use the portable Windows release ZIP:
+extract it and run `sNote.exe` (keep the `_internal` directory next to the EXE).
+The portable executable must be built on Windows by PyInstaller. A *source* ZIP is not a
+portable EXE; Windows machines without Python should use either the auto-install CMD
+package or the portable EXE ZIP.
+
+See [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md) for prerequisites, options, and troubleshooting.
 
 Windows may display a SmartScreen message for a downloaded command file. Select **More info** and
 **Run anyway** only when the ZIP was downloaded from the official project release.
@@ -70,7 +83,7 @@ sn
 The `sn` command starts the GUI and then closes the PowerShell or Command Prompt session that
 launched it, leaving only sNote open. The desktop shortcut never opens a terminal window.
 
-By default, sNote opens centered at approximately **1250 × 950 pixels**. On a smaller display it
+By default, sNote opens centered at approximately **1440 × 900 pixels**. On a smaller display it
 automatically reduces the size to remain within the usable desktop area.
 
 ### Advanced PowerShell installation
@@ -143,8 +156,8 @@ produces a downloadable Windows x64 artifact.
 | Paste as Markdown | `Ctrl+Shift+V` |
 | Toggle preview | `Ctrl+Shift+M` |
 | Toggle line numbers | `Ctrl+L` |
-| Integrated terminal | <kbd>Ctrl</kbd> + <kbd>&#96;</kbd> |
-| External terminal | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>&#96;</kbd> |
+| PowerShell below sNote | <kbd>Ctrl</kbd> + <kbd>&#96;</kbd> |
+| Independent terminal | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>&#96;</kbd> |
 
 The first ten items in each link menu receive number shortcuts:
 
@@ -159,15 +172,15 @@ Use **Manage links** inside any link menu to add, remove, rename, browse for, or
 The menu can open editable text files inside sNote and other files with their default application.
 URLs open in the default browser.
 
-## Integrated terminal
+## PowerShell
 
-On Windows, sNote uses Windows PowerShell. On Linux and macOS, it uses Bash or the available
-system shell. The terminal starts in the current file's folder; a new unsaved document uses the
-application folder.
+sNote does not emulate or embed a terminal. On Windows, press <kbd>Ctrl</kbd> + <kbd>&#96;</kbd> to
+open the real Windows PowerShell in the current document's folder. sNote divides its original
+window area equally: sNote occupies the upper half and native PowerShell occupies the lower half.
+Both windows keep the same width and horizontal position, without requiring extra screen space.
 
-Simple `cp`, `mv`, `rm`, and `mkdir` commands are handled directly. Complex commands containing
-pipes, redirection, command chaining, or scripts are passed to the shell. Terminal commands have
-the same permissions as the current user. Review recursive delete commands carefully.
+Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>&#96;</kbd> to open a normal independent terminal
+window without rearranging sNote. Commands run with the current user's normal permissions.
 
 ## Project layout
 
@@ -194,7 +207,7 @@ GitHub 공개판에는 개인 메모, 개인 프로그램 경로와 최근 파�
 Windows에서는 ZIP의 압축을 푼 뒤 `Install-sNote.cmd`를 더블클릭하면 됩니다. 설치가 끝나면
 설치 창은 자동으로 닫히고 SNote만 실행됩니다. 이후에는 바탕화면의 `sNote` 아이콘이나
 `sn` 명령으로 실행할 수 있습니다. `sn`으로 실행하면 SNote를 실행한 PowerShell 또는 CMD도
-종료됩니다. SNote의 기본 창은 화면 중앙에 약 1250 × 950 크기로 열립니다. Python 없이
+종료됩니다. SNote의 기본 창은 기본 모니터 중앙에 약 1440 × 900 크기로 열립니다. Python 없이
 사용하는 배포본은 GitHub Actions가 만든 Windows ZIP을 내려받아 `sNote.exe`를 실행하면 됩니다.
 
 ## License

@@ -70,17 +70,15 @@ Shortcuts are automatically assigned to the first ten entries:
 
 ## 7. Terminal
 
-- Show or hide the built-in terminal: <kbd>Ctrl</kbd> + <kbd>&#96;</kbd>
-- Open an external terminal: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>&#96;</kbd>
-- For a saved document, the terminal starts in that document's folder.
+- Open the real Windows PowerShell below sNote: <kbd>Ctrl</kbd> + <kbd>&#96;</kbd>
+- Open a normal independent terminal: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>&#96;</kbd>
+- For a saved document, PowerShell starts in that document's folder.
 - For a new document, the sNote program folder is used as the working directory.
-- Run a command: `Enter`
-- Insert a line break while typing a command: `Shift+Enter`
-- Previous/next command: Up/Down Arrow
-- Clear the terminal: `clear` or `cls`
+- sNote divides its original window area in half: the editor uses the upper half and PowerShell
+  uses the lower half with the same width and horizontal position.
 
-Basic file commands such as `cp`, `mv`, `rm`, and `mkdir` are available. Be careful with `rm -r`,
-because it deletes a folder and its contents. Always verify the target path first.
+PowerShell is a separate native program, so it supports its normal commands, interactive programs,
+keyboard behavior, colors, completion, and console features without sNote processing its input.
 
 ## 8. Personal Settings and Backup
 
@@ -108,3 +106,12 @@ installer requests a normal close, so a prompt may appear for any unsaved docume
 - Check the installed version from `Help > About sNote`.
 
 You can reopen this manual at any time from `Help > sNote Manual` or by pressing `F1`.
+
+## Windows installation prerequisites
+
+The easy installer checks for Python 3.10–3.13 (64-bit) and installs an isolated sNote
+Python environment. If Python is absent, it offers to download the official signed
+Python 3.13.17 installer into the user's sNote folder. Missing PyQt5 is installed automatically.
+An internet connection is required when components are missing. For computers where
+installation is restricted, use the portable `sNote.exe` Windows release instead.
+See `INSTALL_WINDOWS.md` in the source package.

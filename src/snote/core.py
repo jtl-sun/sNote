@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import tempfile
+import base64
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -155,6 +156,48 @@ def html_to_markdown(html: str) -> str:
 
 def link_file_name(category: str) -> str:
     return f'{category.lower().replace(" ", "_")}.json'
+
+
+def terminal_command_payload(
+    shell_kind: str, command: str, marker: str, line_ending: str
+) -> str:
+    """Build one parsed shell unit that runs a command and prints its marker.
+
+    Keeping the marker inside the same parsed unit is important for interactive
+    child processes: it prevents the child from consuming the marker as input.
+    """
+    if shell_kind == "powershell":
+        encoded_command = base64.b64encode(command.encode("utf-8")).decode("ascii")
+        marker_command = f"Write-Output ('{marker}' + (Get-Location).Path)"
+        return (
+            "$__snoteCommand=[Text.Encoding]::UTF8.GetString("
+            + f"[Convert]::FromBase64String('{encoded_command}')); "
+            + "try { Invoke-Expression $__snoteCommand } finally { "
+            + marker_command
+            + " }"
+            + line_ending
+        )
+    if shell_kind == "cmd":
+        return command + " & " + f"echo {marker}%CD%" + line_ending
+    marker_command = f"printf '%s\\n' '{marker}'"
+    return (
+        "{\n"
+        + command
+        + line_ending
+        + marker_command
+        + line_ending
+        + "}"
+        + line_ending
+    )
+
+
+def terminal_safe_output_length(buffer: str, marker: str) -> int:
+    """Return the output prefix that cannot be part of a split marker."""
+    maximum = min(len(buffer), max(0, len(marker) - 1))
+    for overlap in range(maximum, 0, -1):
+        if buffer.endswith(marker[:overlap]):
+            return len(buffer) - overlap
+    return len(buffer)
 
 
 def user_config_directory() -> Path:

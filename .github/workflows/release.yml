@@ -19,7 +19,11 @@ jobs:
           cache: pip
       - shell: pwsh
         run: ./scripts/build_windows.ps1
+      - shell: pwsh
+        run: ./scripts/build_source_zip.ps1
       - uses: softprops/action-gh-release@v2
         with:
-          files: release/sNote-*-windows-x64.zip
+          files: |
+            release/sNote-*-windows-x64.zip
+            release/sNote-*-source-auto-install.zip
           generate_release_notes: true

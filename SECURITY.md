@@ -5,9 +5,9 @@
 Please do not include passwords, private notes, local paths, or access tokens in a public issue.
 Report the smallest reproducible example and the affected sNote version to the repository owner.
 
-## Terminal warning
+## PowerShell warning
 
-sNote's integrated terminal executes commands with the same permissions as the current user.
+sNote can launch the native Windows PowerShell with the same permissions as the current user.
 Review commands before running them. Recursive remove commands permanently delete their targets.
 
 ## Privacy

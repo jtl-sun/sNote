@@ -1,0 +1,60 @@
+name: Publish sNote v1.1.5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/snote/__init__.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish:
+    if: github.repository == 'jtl-sun/sNote'
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Ensure exact release version
+        shell: pwsh
+        run: |
+          $version = Get-Content src/snote/__init__.py -Raw
+          if ($version -notmatch '__version__\s*=\s*"1\.1\.5"') { throw "This workflow publishes sNote 1.1.5 only." }
+      - name: Install test dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest -q
+      - name: Build standalone Windows EXE ZIP
+        shell: pwsh
+        run: ./scripts/build_windows.ps1
+      - name: Build auto-install source ZIP
+        shell: pwsh
+        run: ./scripts/build_source_zip.ps1
+      - name: Create SHA256 checksums
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem release -Filter "sNote-1.1.5-*.zip" | Sort-Object Name
+          if ($files.Count -ne 2) { throw "Expected two release ZIPs." }
+          $checksums = @($files | ForEach-Object { "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" })
+          $checksums | Set-Content -Path release/SHA256SUMS.txt -Encoding ascii
+      - name: Publish tagged GitHub Release with both ZIPs
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.1.5
+          target_commitish: ${{ github.sha }}
+          name: sNote 1.1.5
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release/sNote-1.1.5-windows-x64.zip
+            release/sNote-1.1.5-source-auto-install.zip
+            release/SHA256SUMS.txt

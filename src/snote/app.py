@@ -10,6 +10,8 @@ from .core import (
     html_to_markdown,
     link_file_name,
     read_json,
+    terminal_command_payload,
+    terminal_safe_output_length,
     user_config_directory,
 )
 
@@ -195,24 +197,19 @@ class CodeEditor(QPlainTextEdit):
 
 
 class TerminalConsole(QPlainTextEdit):
-    commandSubmitted = pyqtSignal(str)
+    """Read-only terminal output kept separate from keyboard input."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.history = []
-        self.history_index = 0
-        self.input_start = 0
-        self.accepting_input = False
+        self.setReadOnly(True)
         self.setUndoRedoEnabled(False)
+        self.setMaximumBlockCount(10000)
         self.setFont(QFont("Consolas", 11))
-        self.setToolTip("Enter: run command / Shift+Enter: new line")
-
-    def remember(self, command):
-        if command and (not self.history or self.history[-1] != command):
-            self.history.append(command)
-        self.history_index = len(self.history)
+        self.setObjectName("terminalOutput")
 
     def append_output(self, text):
+        if not text:
+            return
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.End)
         output_format = QTextCharFormat()
@@ -222,79 +219,46 @@ class TerminalConsole(QPlainTextEdit):
         self.setTextCursor(cursor)
         self.ensureCursorVisible()
 
-    def show_prompt(self, prompt):
-        if self.toPlainText() and not self.toPlainText().endswith("\n"):
-            self.append_output("\n")
-        cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        prompt_format = QTextCharFormat()
-        prompt_format.setForeground(QColor("#32CD32"))
-        prompt_format.setFontWeight(QFont.Bold)
-        cursor.insertText(prompt, prompt_format)
-        input_format = QTextCharFormat()
-        input_format.setForeground(self.palette().color(QPalette.Text))
-        input_format.setFontWeight(QFont.Normal)
-        cursor.setCharFormat(input_format)
-        self.setTextCursor(cursor)
-        self.ensureCursorVisible()
-        self.input_start = self.document().characterCount() - 1
-        self.accepting_input = True
-        self.setFocus(Qt.OtherFocusReason)
 
-    def current_command(self):
-        return self.toPlainText()[self.input_start:]
+class TerminalInput(QLineEdit):
+    commandSubmitted = pyqtSignal(str)
 
-    def replace_current_command(self, command):
-        cursor = self.textCursor()
-        cursor.setPosition(self.input_start)
-        cursor.movePosition(QTextCursor.End, QTextCursor.KeepAnchor)
-        cursor.insertText(command)
-        self.setTextCursor(cursor)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.history = []
+        self.history_index = 0
+        self.setFont(QFont("Consolas", 11))
+        self.setObjectName("terminalInput")
+        self.setToolTip(
+            "Type a command or a response for the running program, then press Enter"
+        )
+        self.returnPressed.connect(self.submit)
 
-    def move_to_input_end(self):
-        cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.setTextCursor(cursor)
+    def remember(self, command):
+        if command and (not self.history or self.history[-1] != command):
+            self.history.append(command)
+        self.history_index = len(self.history)
+
+    def submit(self):
+        command = self.text()
+        if command.strip():
+            self.remember(command)
+        self.clear()
+        self.commandSubmitted.emit(command)
 
     def keyPressEvent(self, event):
-        if (
-            event.key() in (Qt.Key_Return, Qt.Key_Enter)
-            and not (event.modifiers() & Qt.ShiftModifier)
-        ):
-            if self.accepting_input:
-                command = self.current_command().strip()
-                if command:
-                    self.remember(command)
-                self.move_to_input_end()
-                super().keyPressEvent(event)
-                self.accepting_input = False
-                self.commandSubmitted.emit(command)
-            event.accept()
-            return
-        if not self.accepting_input:
-            if event.matches(QKeySequence.Copy):
-                super().keyPressEvent(event)
-            return
-        if event.key() == Qt.Key_Up and self.history and not (event.modifiers() & Qt.ShiftModifier):
+        if event.key() == Qt.Key_Up and self.history:
             self.history_index = max(0, self.history_index - 1)
-            self.replace_current_command(self.history[self.history_index])
+            self.setText(self.history[self.history_index])
+            self.setCursorPosition(len(self.text()))
             return
-        if event.key() == Qt.Key_Down and self.history and not (event.modifiers() & Qt.ShiftModifier):
+        if event.key() == Qt.Key_Down and self.history:
             self.history_index = min(len(self.history), self.history_index + 1)
-            self.replace_current_command(
+            self.setText(
                 "" if self.history_index == len(self.history) else self.history[self.history_index]
             )
+            self.setCursorPosition(len(self.text()))
             return
-        if event.key() in (Qt.Key_Backspace, Qt.Key_Left):
-            if self.textCursor().position() <= self.input_start:
-                return
-        if event.key() == Qt.Key_Home:
-            cursor = self.textCursor()
-            cursor.setPosition(self.input_start)
-            self.setTextCursor(cursor)
-            return
-        if self.textCursor().position() < self.input_start and event.text():
-            self.move_to_input_end()
         super().keyPressEvent(event)
 
 
@@ -331,11 +295,39 @@ class EmbeddedTerminal(QWidget):
         toolbar.addWidget(self.restart_button)
         layout.addLayout(toolbar)
 
-        self.console = TerminalConsole(self)
+        terminal_surface = QWidget(self)
+        terminal_surface.setObjectName("terminalSurface")
+        terminal_surface.setStyleSheet(
+            "QWidget#terminalSurface { background: #1e1e1e; }"
+            "QPlainTextEdit#terminalOutput {"
+            " background: #1e1e1e; color: #f2f2f2; border: 0; padding: 3px; }"
+            "QLineEdit#terminalInput {"
+            " background: #1e1e1e; color: #f2f2f2; border: 0; padding: 2px 3px;"
+            " selection-background-color: #264f78; }"
+            "QLabel#terminalPrompt {"
+            " background: #1e1e1e; color: #32cd32; border: 0;"
+            " font-family: Consolas; font-size: 11pt; font-weight: bold; }"
+        )
+        surface_layout = QVBoxLayout(terminal_surface)
+        surface_layout.setContentsMargins(0, 0, 0, 0)
+        surface_layout.setSpacing(0)
+
+        self.console = TerminalConsole(terminal_surface)
         self.console.setPlaceholderText("PowerShell starts here.")
-        self.console.commandSubmitted.connect(self.run_command)
-        layout.addWidget(self.console, 1)
-        self.setFocusProxy(self.console)
+        surface_layout.addWidget(self.console, 1)
+
+        input_row = QHBoxLayout()
+        input_row.setContentsMargins(4, 0, 4, 3)
+        input_row.setSpacing(2)
+        self.prompt_label = QLabel(">", terminal_surface)
+        self.prompt_label.setObjectName("terminalPrompt")
+        input_row.addWidget(self.prompt_label)
+        self.command_input = TerminalInput(terminal_surface)
+        self.command_input.commandSubmitted.connect(self.run_command)
+        input_row.addWidget(self.command_input, 1)
+        surface_layout.addLayout(input_row)
+        layout.addWidget(terminal_surface, 1)
+        self.setFocusProxy(self.command_input)
 
     def create_process(self):
         self.process = QProcess(self)
@@ -346,8 +338,8 @@ class EmbeddedTerminal(QWidget):
         self.process.errorOccurred.connect(self.process_error)
 
     def focus_command_input(self):
-        self.console.setFocus(Qt.OtherFocusReason)
-        self.console.activateWindow()
+        self.command_input.setFocus(Qt.OtherFocusReason)
+        self.command_input.activateWindow()
 
     def start(self, working_directory):
         import codecs
@@ -377,7 +369,7 @@ class EmbeddedTerminal(QWidget):
             arguments = ["-i"]
 
         self.append_text(f"Starting terminal in {working_directory}\n")
-        self.console.accepting_input = False
+        self.command_input.setEnabled(False)
         self.process.start(program, arguments)
         if not self.process.waitForStarted(1500):
             self.append_text("Could not start the terminal process.\n")
@@ -390,7 +382,7 @@ class EmbeddedTerminal(QWidget):
         request_id = self.restart_request_id
         self.restart_button.setEnabled(False)
         self.start_serial += 1
-        self.console.accepting_input = False
+        self.command_input.setEnabled(False)
         self.pending_marker = None
         self.output_buffer = ""
         self.dispose_process()
@@ -433,28 +425,36 @@ class EmbeddedTerminal(QWidget):
         if self.process.state() == QProcess.NotRunning:
             self.append_text("[Cannot run command: terminal is not running]\n")
             return
-        if not command.strip():
-            self.console.show_prompt(self.prompt_text())
+        if self.pending_marker:
+            # The shell has not returned, so a child program is waiting for
+            # input. Send this line directly to that program instead of
+            # treating it as a new PowerShell command with another marker.
+            self.append_text(command + self.line_ending())
+            self.process.write(
+                (command + self.line_ending()).encode(
+                    self.shell_encoding(), errors="replace"
+                )
+            )
             return
+        if not command.strip():
+            return
+        self.append_text(self.prompt_text() + command + self.line_ending())
         if command.strip().lower() in {"clear", "cls", "clear-host"}:
             self.console.clear()
-            self.console.show_prompt(self.prompt_text())
             return
         if self.try_run_internal_file_command(command):
             QTimer.singleShot(0, self.show_command_prompt)
             return
         self.command_number += 1
         self.pending_marker = f"__SNOTE_COMMAND_DONE_{self.command_number}__"
-        if self.shell_kind == "powershell":
-            marker_command = (
-                f"Write-Output ('{self.pending_marker}' + (Get-Location).Path)"
-            )
-        elif self.shell_kind == "cmd":
-            marker_command = f"echo {self.pending_marker}%CD%"
-        else:
-            marker_command = f"printf '%s\\n' '{self.pending_marker}'"
-        payload = command + self.line_ending() + marker_command + self.line_ending()
+        # Parse the command and completion marker as one script before
+        # execution. This prevents an external child process from reading the
+        # marker itself as its first answer from the shared stdin pipe.
+        payload = terminal_command_payload(
+            self.shell_kind, command, self.pending_marker, self.line_ending()
+        )
         self.process.write(payload.encode(self.shell_encoding(), errors="replace"))
+        self.prompt_label.setText("Input>")
 
     def try_run_internal_file_command(self, command):
         parsed = self.parse_internal_file_command(command)
@@ -661,10 +661,10 @@ class EmbeddedTerminal(QWidget):
             self.output_buffer = ""
             self.pending_marker = None
             self.append_text(remainder.lstrip("\n"))
-            QTimer.singleShot(100, self.show_command_prompt)
+            QTimer.singleShot(0, self.show_command_prompt)
             return
 
-        safe_length = max(0, len(self.output_buffer) - len(self.pending_marker) - 2)
+        safe_length = terminal_safe_output_length(self.output_buffer, self.pending_marker)
         if safe_length:
             self.append_text(self.output_buffer[:safe_length])
             self.output_buffer = self.output_buffer[safe_length:]
@@ -685,13 +685,12 @@ class EmbeddedTerminal(QWidget):
         if start_serial is not None and start_serial != self.start_serial:
             return
         if self.process.state() != QProcess.NotRunning and not self.pending_marker:
-            self.console.show_prompt(self.prompt_text())
+            self.prompt_label.setText(self.prompt_text())
+            self.command_input.setEnabled(True)
             self.focus_command_input()
 
     def clear(self):
         self.console.clear()
-        if self.process.state() != QProcess.NotRunning and not self.pending_marker:
-            self.console.show_prompt(self.prompt_text())
 
     def process_started(self):
         self.configure_shell_encoding()
@@ -704,6 +703,7 @@ class EmbeddedTerminal(QWidget):
         self.append_text(f"[{shell_name} ready]\n")
         serial = self.start_serial
         self.restart_button.setEnabled(True)
+        self.command_input.setEnabled(True)
         QTimer.singleShot(150, lambda: self.show_command_prompt(serial))
 
     def configure_shell_encoding(self):
@@ -755,7 +755,8 @@ class EmbeddedTerminal(QWidget):
                 self.append_text(remaining)
             self.output_decoder = None
         self.append_text(f"\n[Terminal exited: {exit_code}]\n")
-        self.console.accepting_input = False
+        self.command_input.setEnabled(False)
+        self.prompt_label.setText("Stopped>")
 
     def process_error(self, _error):
         if self.intentional_process_stop:
@@ -771,6 +772,10 @@ class EnhancedSimpleNotePad(QMainWindow):
         self.current_theme = "light"
         self.recent_files = []
         self.find_dialog = None
+        self.powershell_process = None
+        self.powershell_window_title = ""
+        self.powershell_position_attempts = 0
+        self.powershell_layout_rect = None
         self.links_dir = self.resolve_links_directory()
 
         self.load_settings()
@@ -823,16 +828,6 @@ class EnhancedSimpleNotePad(QMainWindow):
         self.preview_dock.setWidget(self.markdown_preview)
         self.addDockWidget(Qt.RightDockWidgetArea, self.preview_dock)
         self.preview_dock.hide()
-
-        # Integrated terminal panel at the bottom (hidden until requested).
-        self.embedded_terminal = EmbeddedTerminal(self)
-        self.terminal_dock = QDockWidget("Terminal", self)
-        self.terminal_dock.setObjectName("terminalDock")
-        self.terminal_dock.setAllowedAreas(Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea)
-        self.terminal_dock.setWidget(self.embedded_terminal)
-        self.terminal_dock.setMinimumHeight(180)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.terminal_dock)
-        self.terminal_dock.hide()
 
         # Menus
         file_menu = self.menuBar().addMenu("&File")
@@ -1204,17 +1199,18 @@ class EnhancedSimpleNotePad(QMainWindow):
 
     # ---------- Terminal Menu ----------
     def create_terminal_menu(self, menu):
-        self.toggle_terminal_action = self.terminal_dock.toggleViewAction()
-        self.toggle_terminal_action.setText("Show &Integrated Terminal")
-        self.toggle_terminal_action.setShortcut(QKeySequence("Ctrl+`"))
-        self.toggle_terminal_action.setStatusTip("Show the terminal panel below the editor")
-        menu.addAction(self.toggle_terminal_action)
-        self.terminal_dock.visibilityChanged.connect(self.terminal_visibility_changed)
+        open_below_action = QAction("Open &PowerShell Below sNote", self)
+        open_below_action.setShortcut(QKeySequence("Ctrl+`"))
+        open_below_action.setStatusTip(
+            "Open the real Windows PowerShell in a separate window below sNote"
+        )
+        open_below_action.triggered.connect(self.open_powershell_below)
+        menu.addAction(open_below_action)
 
         menu.addSeparator()
-        open_external_action = QAction("Open &External Terminal", self)
+        open_external_action = QAction("Open PowerShell &Separately", self)
         open_external_action.setShortcut(QKeySequence("Ctrl+Shift+`"))
-        open_external_action.setStatusTip("Open a separate terminal window")
+        open_external_action.setStatusTip("Open a normal separate terminal window")
         open_external_action.triggered.connect(self.open_terminal)
         menu.addAction(open_external_action)
 
@@ -1232,7 +1228,7 @@ class EnhancedSimpleNotePad(QMainWindow):
                 "About sNote",
                 f"<h3>sNote {APP_VERSION}</h3>"
                 "<p>A focused editor and personal work hub for text, Markdown, "
-                "links, programs, and terminal tasks.</p>"
+                "links, programs, and native PowerShell tasks.</p>"
                 "<p>Settings are stored separately from the application.</p>",
             )
         )
@@ -1270,16 +1266,6 @@ class EnhancedSimpleNotePad(QMainWindow):
 
         dialog.exec_()
 
-    def terminal_visibility_changed(self, visible):
-        if not visible:
-            return
-        working_dir = self.terminal_working_directory()
-        if self.embedded_terminal.process.state() == QProcess.NotRunning:
-            self.embedded_terminal.start(working_dir)
-        else:
-            self.embedded_terminal.change_directory(working_dir)
-        QTimer.singleShot(0, self.embedded_terminal.focus_command_input)
-
     def terminal_working_directory(self):
         """Use the current file's folder, or the sNote folder for a new document."""
         editor = self.get_current_editor()
@@ -1292,6 +1278,133 @@ class EnhancedSimpleNotePad(QMainWindow):
         if getattr(sys, "frozen", False):
             return Path(sys.executable).resolve().parent
         return Path(__file__).resolve().parent
+
+    def open_powershell_below(self):
+        """Open real PowerShell and tile its native window below sNote."""
+        import os
+        import shutil
+        import subprocess
+
+        working_dir = self.terminal_working_directory()
+        if not sys.platform.startswith("win"):
+            self.open_terminal()
+            return
+
+        if self.powershell_process is not None and self.powershell_process.poll() is None:
+            self.powershell_position_attempts = 0
+            self.position_powershell_below()
+            return
+
+        powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+        if not powershell:
+            QMessageBox.warning(self, "Open PowerShell", "Windows PowerShell was not found.")
+            return
+
+        self.powershell_window_title = f"sNote PowerShell {os.getpid()}-{id(self)}"
+        if self.powershell_layout_rect is None:
+            self.powershell_layout_rect = QRect(self.frameGeometry())
+        escaped_title = self.powershell_window_title.replace("'", "''")
+        escaped_directory = str(working_dir).replace("'", "''")
+        startup_command = (
+            f"$Host.UI.RawUI.WindowTitle = '{escaped_title}'; "
+            f"Set-Location -LiteralPath '{escaped_directory}'"
+        )
+        try:
+            self.powershell_process = subprocess.Popen(
+                [powershell, "-NoLogo", "-NoExit", "-Command", startup_command],
+                cwd=str(working_dir),
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+        except Exception as error:
+            QMessageBox.warning(
+                self,
+                "Open PowerShell",
+                f"Could not open PowerShell in:\n{working_dir}\n\n{error}",
+            )
+            return
+
+        self.powershell_position_attempts = 0
+        QTimer.singleShot(100, self.position_powershell_below)
+        self.statusBar().showMessage(f"PowerShell opened below sNote: {working_dir}", 3000)
+
+    def position_powershell_below(self):
+        """Find the titled native console window and place it below this window."""
+        if not sys.platform.startswith("win") or not self.powershell_window_title:
+            return
+        if self.powershell_process is None or self.powershell_process.poll() is not None:
+            return
+
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        user32.EnumWindows.argtypes = [ctypes.c_void_p, wintypes.LPARAM]
+        user32.EnumWindows.restype = wintypes.BOOL
+        user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+        user32.GetWindowTextLengthW.restype = ctypes.c_int
+        user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.GetWindowTextW.restype = ctypes.c_int
+        user32.SetWindowPos.argtypes = [
+            wintypes.HWND,
+            wintypes.HWND,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            wintypes.UINT,
+        ]
+        user32.SetWindowPos.restype = wintypes.BOOL
+        user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+        user32.SetForegroundWindow.restype = wintypes.BOOL
+        matches = []
+        enum_callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        @enum_callback
+        def collect_window(handle, _parameter):
+            length = user32.GetWindowTextLengthW(handle)
+            if length:
+                title = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(handle, title, length + 1)
+                if self.powershell_window_title in title.value:
+                    matches.append(handle)
+                    return False
+            return True
+
+        user32.EnumWindows(collect_window, 0)
+        if not matches:
+            self.powershell_position_attempts += 1
+            if self.powershell_position_attempts < 40:
+                QTimer.singleShot(100, self.position_powershell_below)
+            return
+
+        screen = self.screen() or QApplication.primaryScreen()
+        available = screen.availableGeometry()
+        layout_rect = self.powershell_layout_rect or self.frameGeometry()
+        width = min(layout_rect.width(), available.width())
+        x = max(available.left(), min(layout_rect.left(), available.right() - width + 1))
+        top = max(available.top(), min(layout_rect.top(), available.bottom() - 399))
+        total_height = min(layout_rect.height(), available.bottom() - top + 1)
+        note_height = total_height // 2
+        terminal_y = top + note_height
+        terminal_height = total_height - note_height
+
+        # Split the original sNote window footprint in half, rather than using
+        # additional desktop space. Repeated Ctrl+` presses reuse this original
+        # rectangle so the windows never become progressively smaller.
+        swp_show_window = 0x0040
+        user32.SetWindowPos(
+            wintypes.HWND(int(self.winId())),
+            0,
+            x,
+            top,
+            width,
+            note_height,
+            swp_show_window,
+        )
+        user32.SetWindowPos(
+            matches[0], 0, x, terminal_y, width, terminal_height, swp_show_window
+        )
+        user32.SetForegroundWindow(matches[0])
 
     def open_terminal(self):
         import shutil
@@ -2000,8 +2113,6 @@ class EnhancedSimpleNotePad(QMainWindow):
                 elif ret == QMessageBox.Cancel:
                     event.ignore()
                     return
-        if hasattr(self, "embedded_terminal"):
-            self.embedded_terminal.stop()
         event.accept()
 
 
@@ -2311,11 +2422,11 @@ def set_initial_window_geometry(window, app):
     """Open centered at the practical size requested for a desktop workspace."""
     screen = app.primaryScreen()
     if screen is None:
-        window.resize(1250, 950)
+        window.resize(1440, 900)
         return
     available = screen.availableGeometry()
-    width = min(1250, max(480, available.width() - 80))
-    height = min(950, max(360, available.height() - 80))
+    width = min(1440, max(480, available.width() - 80))
+    height = min(900, max(360, available.height() - 80))
     left = available.x() + (available.width() - width) // 2
     top = available.y() + (available.height() - height) // 2
     window.setGeometry(left, top, width, height)
