@@ -1,11 +1,11 @@
-name: Publish sNote v1.1.5
+name: Publish sNote release
 
 on:
   push:
     branches: [main]
     paths:
       - "src/snote/__init__.py"
-      - "src/snote/app.py"
+      - ".github/workflows/publish.yml"
   workflow_dispatch:
 
 permissions:
@@ -23,11 +23,14 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Ensure exact release version
+      - name: Read and validate release version
+        id: version
         shell: pwsh
         run: |
-          $version = Get-Content src/snote/__init__.py -Raw
-          if ($version -notmatch '__version__\s*=\s*"1\.1\.5"') { throw "This workflow publishes sNote 1.1.5 only." }
+          $source = Get-Content src/snote/__init__.py -Raw
+          if ($source -notmatch '__version__\s*=\s*"(\d+\.\d+\.\d+)"') { throw "Invalid sNote release version." }
+          $number = $Matches[1]
+          "number=$number" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Install test dependencies
         run: python -m pip install -e ".[dev]"
       - name: Lint
@@ -43,19 +46,20 @@ jobs:
       - name: Create SHA256 checksums
         shell: pwsh
         run: |
-          $files = Get-ChildItem release -Filter "sNote-1.1.5-*.zip" | Sort-Object Name
-          if ($files.Count -ne 2) { throw "Expected two release ZIPs." }
+          $version = '${{ steps.version.outputs.number }}'
+          $files = @(Get-ChildItem release -Filter "sNote-$version-*.zip" | Sort-Object Name)
+          if ($files.Count -ne 2) { throw "Expected two release ZIPs for version $version." }
           $checksums = @($files | ForEach-Object { "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" })
           $checksums | Set-Content -Path release/SHA256SUMS.txt -Encoding ascii
       - name: Publish tagged GitHub Release with both ZIPs
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.5
+          tag_name: v${{ steps.version.outputs.number }}
           target_commitish: ${{ github.sha }}
-          name: sNote 1.1.5
+          name: sNote ${{ steps.version.outputs.number }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            release/sNote-1.1.5-windows-x64.zip
-            release/sNote-1.1.5-source-auto-install.zip
+            release/sNote-${{ steps.version.outputs.number }}-windows-x64.zip
+            release/sNote-${{ steps.version.outputs.number }}-source-auto-install.zip
             release/SHA256SUMS.txt
