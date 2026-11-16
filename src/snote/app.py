@@ -65,7 +65,7 @@ class CodeEditor(QPlainTextEdit):
         self.file_path = None
         self.current_file = "Untitled"
         self.theme = "light"
-        
+
         self.lineNumberArea = LineNumberArea(self)
 
         self.blockCountChanged.connect(self.updateLineNumberAreaWidth)
@@ -923,7 +923,7 @@ class EnhancedSimpleNotePad(QMainWindow):
     # ---------- Tab Management ----------
     def add_new_tab(self, file_path=None, content=""):
         editor = CodeEditor(self)
-        
+
         # Inherit current font size
         if self.tab_widget.count() > 0:
             current_editor = self.get_current_editor()
@@ -1452,23 +1452,28 @@ class EnhancedSimpleNotePad(QMainWindow):
     # ---------- Edit Actions Helpers ----------
     def undo(self):
         editor = self.get_current_editor()
-        if editor: editor.undo()
+        if editor:
+            editor.undo()
 
     def redo(self):
         editor = self.get_current_editor()
-        if editor: editor.redo()
+        if editor:
+            editor.redo()
 
     def cut(self):
         editor = self.get_current_editor()
-        if editor: editor.cut()
+        if editor:
+            editor.cut()
 
     def copy(self):
         editor = self.get_current_editor()
-        if editor: editor.copy()
+        if editor:
+            editor.copy()
 
     def paste(self):
         editor = self.get_current_editor()
-        if editor: editor.paste()
+        if editor:
+            editor.paste()
 
     def paste_as_markdown(self):
         editor = self.get_current_editor()
@@ -1477,7 +1482,8 @@ class EnhancedSimpleNotePad(QMainWindow):
 
     def select_all(self):
         editor = self.get_current_editor()
-        if editor: editor.selectAll()
+        if editor:
+            editor.selectAll()
 
     # ---------- Font helpers ----------
     def change_font_size(self):
@@ -1671,9 +1677,9 @@ class EnhancedSimpleNotePad(QMainWindow):
 
                 current_editor = self.get_current_editor()
                 is_empty_untitled = (
-                    current_editor and 
-                    current_editor.file_path is None and 
-                    not current_editor.document().isModified() and 
+                    current_editor and
+                    current_editor.file_path is None and
+                    not current_editor.document().isModified() and
                     current_editor.toPlainText() == ""
                 )
 
@@ -1853,9 +1859,9 @@ class EnhancedSimpleNotePad(QMainWindow):
 
         current_editor = self.get_current_editor()
         is_empty_untitled = (
-            current_editor and 
-            current_editor.file_path is None and 
-            not current_editor.document().isModified() and 
+            current_editor and
+            current_editor.file_path is None and
+            not current_editor.document().isModified() and
             current_editor.toPlainText() == ""
         )
 

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "src/snote/__init__.py"
+      - "src/snote/app.py"
   workflow_dispatch:
 
 permissions:
