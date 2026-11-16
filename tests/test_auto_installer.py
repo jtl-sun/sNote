@@ -79,3 +79,27 @@ def test_damaged_old_environment_is_preserved_for_recovery():
     assert r'envs\repair-' in INSTALL
     assert 'install-diagnostics.log' in INSTALL
     assert 'No existing notes, settings or old release were deleted.' in INSTALL
+
+
+def test_slow_dependency_setup_has_live_spinner_and_elapsed_time():
+    assert 'function Wait-InstallerProcess' in INSTALL
+    assert "@('/', '-', '\\', '|')" in INSTALL
+    assert 'WaitForExit(300)' in INSTALL
+    assert 'Elapsed' in INSTALL
+    assert 'Write-Host ("`r" + $Line.PadRight($Width)) -NoNewline' in INSTALL
+    assert 'Start-Process -FilePath $Executable -ArgumentList ($Arguments -join' in INSTALL
+    assert '-PassThru' in INSTALL
+
+
+def test_install_percentages_are_phase_estimates_not_fake_download_progress():
+    assert 'Percentages are milestones for completed installation phases' in INSTALL
+    assert 'Set-InstallPhase -Percent 42' in INSTALL
+    assert 'Set-InstallPhase -Percent 80' in INSTALL
+    assert 'Set-InstallPhase -Percent 100' in INSTALL
+    assert 'Installing collected packages' in INSTALL
+    assert '[~{0,3}%]' in INSTALL
+
+
+def test_private_python_installer_also_shows_progress():
+    assert 'Wait-InstallerProcess -Process $Process -Label "Installing Python runtime"' in INSTALL
+    assert 'Set-InstallPhase -Percent 16' in INSTALL

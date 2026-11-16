@@ -54,7 +54,7 @@ explains the requirement and asks permission to download the official Python 3.1
 from python.org. Python is installed privately under `%LOCALAPPDATA%\sNote\python` without
 administrator rights or changing the system Python or PATH. If PyQt5 is missing, outdated, or
 broken, the installer installs it into the private sNote virtual environment. An internet
-connection is required to fetch missing components. The install log is saved in
+connection is required to fetch missing components. The installer displays an animated spinner and estimated phase-based percentages during slow dependency setup. The install log is saved in
 `%LOCALAPPDATA%\sNote\install.log`. Existing notes and settings are never erased.
 
 If you do **not** want to install Python or PyQt5, use the portable Windows release ZIP:

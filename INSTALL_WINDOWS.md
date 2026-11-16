@@ -1,10 +1,10 @@
-# sNote 1.1.5: Windows installation and update
+# sNote 1.1.6: Windows installation and update
 
 This guide applies to Windows 11, 64-bit. No administrator account is needed for the auto-installer.
 
 ## Option 1: easy auto-installer (source package)
 
-1. Extract **sNote-1.1.5-source-auto-install.zip** to a normal folder.
+1. Extract **sNote-1.1.6-source-auto-install.zip** to a normal folder.
 2. Double-click **Install-sNote.cmd**. Do not run the CMD directly from within ZIP preview.
 3. If a compatible 64-bit Python 3.10–3.13 is available, the installer uses it only to create an
    isolated sNote virtual environment. Python used by other programs is not modified.
@@ -15,7 +15,11 @@ This guide applies to Windows 11, 64-bit. No administrator account is needed for
 5. If pip is missing, it is restored locally. If PyQt5 is missing, outdated, or fails to import,
    the installer downloads and installs it
    into `%LOCALAPPDATA%\sNote\venv` (or a new `%LOCALAPPDATA%\sNote\envs\repair-*` folder when repairing a damaged existing environment). No system-wide pip package is altered.
-6. When installation completes, sNote starts and a desktop shortcut appears.
+6. During environment creation or PyQt5 installation, the installer displays a rotating
+   `/ - \ |` symbol, elapsed seconds and **approximate stage progress**, such as `[~42%]`.
+   The percentage is a phase estimate, **not** a measured percentage of downloaded bytes.
+   A steady percentage with a moving spinner means the installer is still waiting for a process.
+7. When installation completes, sNote starts and a desktop shortcut appears.
 
 The installer needs internet access **only when components are missing**. If the automatic
 Python download is blocked by a proxy, antivirus or workplace policy, use the portable option
@@ -23,7 +27,7 @@ below or install official Python manually and rerun Install-sNote.cmd.
 
 ## Option 2: portable Windows app (no Python installation)
 
-Download the **sNote-1.1.5-windows-x64.zip** release artifact when it has been published.
+Download the **sNote-1.1.6-windows-x64.zip** release artifact when it has been published.
 Extract it, and run `sNote.exe` in the extracted folder. Keep `_internal` together with
 `sNote.exe`. Python and PyQt5 are bundled inside this PyInstaller build.
 
@@ -60,7 +64,7 @@ To uninstall the application (while preserving personal settings), run `Uninstal
 
 ## For developers
 
-GitHub Actions on Windows builds both ZIP types for a tagged `v1.1.5` release:
+GitHub Actions on Windows builds both ZIP types for a tagged `v1.1.6` release:
 `scripts/build_windows.ps1` produces a portable PyInstaller EXE bundle, and
 `scripts/build_source_zip.ps1` produces the automatic dependency installer source ZIP.
 Do not publish a version tag until Windows CI and a clean-machine install are verified.

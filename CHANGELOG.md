@@ -2,6 +2,13 @@
 
 All notable changes are documented here.
 
+## 1.1.6 - 2026-11-16
+
+- Show a rotating `/ - \ |` heartbeat and elapsed seconds during slow dependency installation.
+- Report approximate milestone-based installation percentages without pretending they reflect measured download bytes.
+- Inspect pip output milestones when available and keep the animated indicator active if output is buffered.
+- Show progress while the private Python installer runs, without changing error logs or saved user settings.
+
 ## 1.1.5 - 2026-11-16
 
 - Prevent Windows PowerShell 5.1 from treating stderr from a Python dependency check as a fatal NativeCommandError.

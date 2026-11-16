@@ -1,4 +1,4 @@
-# sNote 1.1.5 Windows installer: Python 3.10-3.13 (x64) and PyQt5 are installed
+# sNote 1.1.6 Windows installer: Python 3.10-3.13 (x64) and PyQt5 are installed
 # automatically when required. All managed dependencies are per-user.
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
@@ -54,6 +54,64 @@ function Invoke-PythonProbe {
     }
 }
 
+# Percentages are milestones for completed installation phases, NOT measured
+# download percentages. Keep the counter static if a subprocess provides no output.
+$script:InstallPhasePercent = 0
+function Set-InstallPhase {
+    param([int]$Percent, [string]$Message)
+    $script:InstallPhasePercent = [Math]::Max($script:InstallPhasePercent, [Math]::Min(100, $Percent))
+    Write-Host ("[~{0,3}%] {1}" -f $script:InstallPhasePercent, $Message)
+}
+
+# Start-Process -Wait hides pip's output until the process exits. Keep both
+# redirected logs for diagnostics, but animate a heartbeat on the parent
+# console so a slow network connection never looks like an installer freeze.
+function Wait-InstallerProcess {
+    param(
+        [System.Diagnostics.Process]$Process,
+        [string]$Label,
+        [int]$PhasePercent,
+        [string]$OutputFile = ""
+    )
+    $Frames = @('/', '-', '\', '|')
+    $Started = Get-Date
+    $FrameIndex = 0
+    $ProgressPercent = $PhasePercent
+    $LastLogText = ""
+    $Width = 74
+    try {
+        try { $Width = [Math]::Max(45, [Math]::Min(94, [Console]::WindowWidth - 2)) } catch { }
+        while (-not $Process.WaitForExit(300)) {
+            # pip writes status messages to stdout, which may be buffered.
+            # Only update the phase estimate when an actual pip milestone appears.
+            if ($Label -eq "Installing PyQt5" -and $OutputFile -and ($FrameIndex % 4 -eq 0)) {
+                try {
+                    $Recent = @(Get-Content -LiteralPath $OutputFile -Tail 12 -ErrorAction Stop) -join "`n"
+                    if ($Recent -ne $LastLogText) {
+                        $LastLogText = $Recent
+                        if ($Recent -match 'Installing collected packages') {
+                            $ProgressPercent = [Math]::Max($ProgressPercent, 70)
+                        } elseif ($Recent -match 'Downloading|Using cached') {
+                            $ProgressPercent = [Math]::Max($ProgressPercent, 52)
+                        }
+                    }
+                } catch { }
+            }
+            $Elapsed = [int]((Get-Date) - $Started).TotalSeconds
+            $Spin = $Frames[$FrameIndex % $Frames.Count]
+            $FrameIndex++
+            $Line = "[~$ProgressPercent%] [$Spin] $Label - ${Elapsed}s elapsed (working)"
+            if ($Line.Length -gt $Width) { $Line = $Line.Substring(0, $Width) }
+            Write-Host ("`r" + $Line.PadRight($Width)) -NoNewline
+        }
+        $Process.WaitForExit()
+        return [int]$Process.ExitCode
+    } finally {
+        # Erase the last spinner frame, even if the child exits with an error.
+        Write-Host ("`r" + (" " * $Width) + "`r") -NoNewline
+    }
+}
+
 function Invoke-PythonSetup {
     param([string]$Executable, [string[]]$Arguments, [string]$Label)
     $Id = [guid]::NewGuid().ToString('N')
@@ -61,18 +119,19 @@ function Invoke-PythonSetup {
     $Stderr = Join-Path $env:TEMP "snote-setup-$Id.stderr"
     try {
         Write-Host "$Label ..."
-        $Process = Start-Process -FilePath $Executable -ArgumentList ($Arguments -join ' ') -Wait -PassThru `
+        $Process = Start-Process -FilePath $Executable -ArgumentList ($Arguments -join ' ') -PassThru `
             -WindowStyle Hidden -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr -ErrorAction Stop
+        $Code = Wait-InstallerProcess -Process $Process -Label $Label -PhasePercent $script:InstallPhasePercent -OutputFile $Stdout
         $OutText = if (Test-Path $Stdout) { Get-Content $Stdout -Raw -ErrorAction SilentlyContinue } else { "" }
         $ErrText = if (Test-Path $Stderr) { Get-Content $Stderr -Raw -ErrorAction SilentlyContinue } else { "" }
         if ($OutText) { Write-Host $OutText.TrimEnd() }
-        if ($Process.ExitCode -ne 0) {
-            Add-InstallerDiagnostic "$Label failed (exit $($Process.ExitCode)):`nSTDOUT: $OutText`nSTDERR: $ErrText"
+        if ($Code -ne 0) {
+            Add-InstallerDiagnostic "$Label failed (exit $Code):`nSTDOUT: $OutText`nSTDERR: $ErrText"
             if ($ErrText) { Write-Host ($ErrText -split "`n" | Select-Object -Last 12) -ForegroundColor Yellow }
         } elseif ($ErrText) {
             Add-InstallerDiagnostic "$Label completed with warnings: $ErrText"
         }
-        return [int]$Process.ExitCode
+        return $Code
     } catch {
         Add-InstallerDiagnostic "$Label failed to start: $($_ | Out-String)"
         throw "Unable to run $Label. See $DiagnosticsLog. $($_.Exception.Message)"
@@ -146,15 +205,16 @@ function Install-PrivatePython {
         }
 
         Write-Host "Verified digital signature: Python Software Foundation"
-        Write-Host "Installing private Python runtime..."
+        Set-InstallPhase -Percent 16 -Message "Installing private Python runtime"
         $Arguments = @(
             "/quiet", "InstallAllUsers=0", "Include_pip=1", "Include_launcher=0",
             "PrependPath=0", "Include_test=0", "Include_doc=0", "Include_dev=0",
             "TargetDir=`"$RuntimeRoot`""
         )
-        $Process = Start-Process -FilePath $Download -ArgumentList $Arguments -Wait -PassThru
-        if ($Process.ExitCode -ne 0) {
-            throw "Python installation failed (exit code $($Process.ExitCode)). Check Windows policies or use the portable release."
+        $Process = Start-Process -FilePath $Download -ArgumentList $Arguments -PassThru
+        $Code = Wait-InstallerProcess -Process $Process -Label "Installing Python runtime" -PhasePercent $script:InstallPhasePercent
+        if ($Code -ne 0) {
+            throw "Python installation failed (exit code $Code). Check Windows policies or use the portable release."
         }
         $ManagedPython = Join-Path $RuntimeRoot "python.exe"
         if (-not (Test-Path $ManagedPython) -or -not (Test-PythonVersion $ManagedPython)) {
@@ -183,6 +243,7 @@ except Exception:
 }
 
 try {
+    Set-InstallPhase -Percent 5 -Message "Checking current sNote installation"
     $FreshInstall = -not (Test-Path $Python)
     if (-not $FreshInstall) {
         Write-Host "Existing sNote installation found. Preparing a side-by-side update..."
@@ -205,12 +266,13 @@ try {
     }
 
     if ($FreshInstall) {
-        Write-Host "Checking for a compatible Python runtime..."
+        Set-InstallPhase -Percent 12 -Message "Checking for a compatible Python runtime"
         $Interpreter = Find-AvailablePython
         if ($null -eq $Interpreter) { $Interpreter = Install-PrivatePython }
         Write-Host "Using $($Interpreter.Source). Creating an isolated sNote environment..."
         $SelectedPython = [string]$Interpreter.Executable
         $PythonArgs = @($Interpreter.Prefix) + @('-m', 'venv', "`"$VenvRoot`"")
+        Set-InstallPhase -Percent 25 -Message "Creating isolated Python environment"
         $Code = Invoke-PythonSetup -Executable $SelectedPython -Arguments $PythonArgs -Label "Creating virtual environment"
         if ($Code -ne 0 -or -not (Test-Path $Python)) {
             throw "Could not create the sNote Python environment. See $DiagnosticsLog."
@@ -221,19 +283,23 @@ try {
         throw "The Python GUI launcher (pythonw.exe) is missing from the environment. See $DiagnosticsLog."
     }
 
+    Set-InstallPhase -Percent 35 -Message "Checking PyQt5 and pip"
     # Check installed GUI before pip. A healthy existing installation must never
     # fail merely because its pip package is missing or damaged.
     if (-not (Test-PyQt5 $Python)) {
         $PipProbe = 'import importlib.util,sys; sys.exit(0 if importlib.util.find_spec("pip") else 1)'
         if (-not (Invoke-PythonProbe -Executable $Python -Script $PipProbe -Label "pip availability check")) {
             Write-Host "pip is missing. Restoring pip inside the isolated environment..."
+            Set-InstallPhase -Percent 38 -Message "Repairing pip"
             $Code = Invoke-PythonSetup -Executable $Python -Arguments @('-m', 'ensurepip', '--upgrade') -Label "Restoring pip"
             if ($Code -ne 0) { throw "Could not restore pip. See $DiagnosticsLog." }
         }
         Write-Host "PyQt5 is missing, outdated or damaged. Installing its required packages..."
         $Requirements = Join-Path $ProjectRoot "requirements.txt"
+        Set-InstallPhase -Percent 42 -Message "Downloading and installing PyQt5 (network-dependent)"
         $Code = Invoke-PythonSetup -Executable $Python -Arguments @('-m', 'pip', 'install', '-r', "`"$Requirements`"", '--upgrade') -Label "Installing PyQt5"
         if ($Code -ne 0) { throw "Could not install PyQt5. Check network/proxy settings and $DiagnosticsLog." }
+        Set-InstallPhase -Percent 80 -Message "Verifying installed PyQt5"
         if (-not (Test-PyQt5 $Python)) {
             throw "PyQt5 still cannot be loaded after installation. See $DiagnosticsLog."
         }
@@ -241,6 +307,7 @@ try {
         Write-Host "PyQt5 is installed and working."
     }
 
+    Set-InstallPhase -Percent 85 -Message "Preparing sNote application files"
     $VersionText = Get-Content (Join-Path $ProjectRoot "src/snote/__init__.py") -Raw
     if ($VersionText -notmatch '__version__\s*=\s*"([^"]+)"') {
         throw "Could not determine the sNote version."
@@ -303,6 +370,7 @@ shell.Run Chr(34) & "$Pythonw" & Chr(34) & " -m snote", 0, False
         Copy-Item (Join-Path $LegacyLinks "*.json") $UserSettings -Force
     }
 
+    Set-InstallPhase -Percent 96 -Message "Activating new sNote release"
     # Switch to the new release only after dependencies and launchers succeed.
     [System.IO.File]::WriteAllText(
         (Join-Path $InstallRoot "current_release.txt"), $ReleaseRoot, [System.Text.Encoding]::UTF8
@@ -331,11 +399,13 @@ shell.Run Chr(34) & "$Pythonw" & Chr(34) & " -m snote", 0, False
         }
     )
     if ($StillRunning.Count -eq 0) {
+        Set-InstallPhase -Percent 99 -Message "Launching sNote"
         $env:PYTHONPATH = $ReleaseRoot
         Start-Process -FilePath $Pythonw -ArgumentList "-m", "snote" -WorkingDirectory $InstallRoot
     } else {
         Write-Host "Update installed. Close and reopen sNote to use the new version."
     }
+    Set-InstallPhase -Percent 100 -Message "Installation complete"
 } catch {
     $Failure = ($_ | Out-String)
     $FailureLine = $_.InvocationInfo.ScriptLineNumber
